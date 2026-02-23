@@ -64,11 +64,14 @@ description: >
 
 8. **苏格拉底质询** → 加载 [rules/socratic.md](rules/socratic.md) 执行
    - 基于基线报告 + facet 中的 ai_collab 证据，向用户发起 3 轮攻击性提问
-   - 质询完成后追加「思维尸检」和「行为纠偏」到报告
+   - 第 4 轮：触发条件提炼，将行为纠偏中的强制约束转化为 Gene 候选
+   - 质询完成后追加「思维尸检」+「行为纠偏」+「Gene 候选表」到报告
 
 9. **确认并存盘**
    - 询问：「大锅，报告 + 质询结果都在这了，需要补充或调整吗？」
-   - 用户确认后才写入 `.retro/reviews/YYYY-MM-DD-init.md`
+   - 用户确认后：
+     1. 执行 Step 6（Gene 化 + CLAUDE.md 注入）→ 加载 [rules/gene-protocol.md](rules/gene-protocol.md)
+     2. 写入 `.retro/reviews/YYYY-MM-DD-init.md`
    - **严禁跳过确认直接存盘**
 
 初始化完成后，本次不再执行中期复盘。提示用户下次直接 `/madness`。
@@ -187,15 +190,38 @@ mid 和 final 模式执行**两阶段分析**，不允许一次成型：
 ```
 1. 将完整报告展示给用户（中文）
 2. 苏格拉底质询 → 加载 rules/socratic.md 执行
-   - 基于报告 + facet 中的 ai_collab 证据，向用户发起 3 轮攻击性提问
-   - 质询完成后追加「思维尸检」和「行为纠偏」到报告
+   - 基于报告 + facet 中的 ai_collab + Gene 验证弹药，向用户发起 3 轮攻击性提问
+   - 第 4 轮：触发条件提炼（含 Gene 验证中需修订的资产）
+   - 质询完成后追加「思维尸检」+「行为纠偏」+「Gene 候选表」到报告
 3. 询问：「大锅，报告 + 质询结果都在这了，需要补充或调整吗？」
 4. 等待用户确认
    - 严禁在用户确认前写入文件
 5. 确认后：
+   - 执行 Step 6（Gene 化 + CLAUDE.md 注入）
    - 写入 .retro/reviews/YYYY-MM-DD-{mid|final}.md
    - 更新 state.json（last_review_at、reviews 数组、sessions_analyzed_up_to）
-   - 如果是 final 模式，额外更新 memory/ 下的经验文件
+   - 如果是 final 模式，额外执行 portable.json 导出（见 [rules/final-review.md](rules/final-review.md) 沉淀逻辑）
+```
+
+### Step 6: Gene 化 + CLAUDE.md 注入（所有模式，用户确认后执行）
+
+> **注意**：此步骤在用户确认报告后执行，是存盘流程的一部分。
+
+```
+前置条件：用户已确认报告内容（包括苏格拉底质询第 4 轮的 Gene 候选）
+
+执行：加载 rules/gene-protocol.md 执行 Step 6.1 ~ 6.5
+
+具体流程：
+1. 收集 Gene 候选（来自质询第 4 轮 + 报告改进建议）
+2. 分类为 gene/sop/pref
+3. 写入 memory/ 对应 JSON 文件（confidence=0.70, status=provisional）
+4. 执行 CLAUDE.md 注入 Reflection（合并/吸收/替换/新增）
+5. 生成领域视图 MD
+
+如果 memory/ 目录不存在 → 先执行 gene-protocol.md 中的目录初始化
+
+如果本次复盘无 Gene 候选（全部「已澄清」或「待观察」）→ 跳过写入，仅执行验证结果的 confidence 更新
 ```
 
 ---
