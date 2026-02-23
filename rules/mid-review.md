@@ -7,6 +7,19 @@
 - 本轮新 session 的所有 facet（从 .retro/facets/ 读取，筛选上次复盘之后的）
 - 项目目录产出物变化清单
 
+## 执行：阶段 A.0 — Gene 验证与偏离检测
+
+> 在常规两阶段分析之前执行。如果 memory/ 不存在或无活跃资产 → 跳过此阶段。
+
+加载 [rules/validation-protocol.md](validation-protocol.md) 执行：
+
+1. **Gene 验证**：对所有 active/provisional 资产，检查本轮 facet 中是否有匹配场景，验证遵守情况和效果
+2. **偏离检测**：检查 SOP 偏离、Pref 偏离、新模式发现
+3. **弹药准备**：将验证发现（遵守但无效、未遵守但成功、偏离）传递给苏格拉底质询
+4. **产出**：Gene 验证报告（追加到分析报告最前面）
+
+验证完成后，更新 memory/ 中资产的 confidence 和 status。
+
 ## 执行：聚合分析
 
 ### 分析组 A：诊断（按顺序逐项分析）
@@ -110,6 +123,9 @@
 
 ---
 
+### Gene 验证报告
+（如果执行了阶段 A.0，在此展示验证结果表格、偏离告警、新 Gene 候选。格式见 [validation-protocol.md](validation-protocol.md) 的「输出」section。如未执行阶段 A.0 则省略此 section。）
+
 ### 做得好的
 - [1-2 条亮点]
 - 每条必须有证据（哪个 session、什么行为、什么结果）
@@ -144,6 +160,8 @@ Summary 展示后，必须询问：
 - [ ] 每条改进有可执行步骤（不是空话）？
 - [ ] 是否先展示给用户确认，而非直接写入文件？
 - [ ] 对照 [bad-cases.md](bad-cases.md) 中的 5 条自检规则？
+- [ ] 如果存在活跃 Gene/SOP/Pref，是否执行了阶段 A.0 验证？
+- [ ] Gene 验证报告中每条判定是否有 session 原文证据？
 
 ## 注意事项
 
