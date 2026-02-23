@@ -12,7 +12,7 @@
 
 > 在常规两阶段分析之前执行。如果 memory/ 不存在或无活跃资产 → 跳过此阶段。
 
-加载 [rules/validation-protocol.md](validation-protocol.md) 执行：
+加载 [validation-protocol.md](validation-protocol.md) 执行：
 
 1. **Gene 验证**：对所有 active/provisional 资产，检查全部 facet 中是否有匹配场景，验证遵守情况和效果
 2. **偏离检测**：检查 SOP 偏离、Pref 偏离、新模式发现
@@ -196,7 +196,7 @@ Summary 展示后，必须询问：
 ```
 1. 写入 .retro/reviews/YYYY-MM-DD-final.md（完整分析）
 2. 更新 state.json
-3. 执行 Step 6（Gene 化 + CLAUDE.md 注入）→ 加载 [rules/gene-protocol.md](gene-protocol.md)
+3. 执行 Step 6（Gene 化 + CLAUDE.md 注入）→ 加载 [gene-protocol.md](gene-protocol.md)
 4. 生成 portable.json 导出包：
    - 筛选 memory/ 中 status=active 且 confidence ≥ 0.70 的资产
    - 将 confidence 重置为 portable_confidence = 0.60

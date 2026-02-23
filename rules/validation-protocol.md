@@ -76,6 +76,8 @@ FOR each asset IN all_active_assets:
     - confidence ≥ 0.85 → status = "active"
     - 0.50 ≤ confidence < 0.85 → status = "provisional"
     - confidence < 0.50 → status = "deprecated"
+      写入 evolution.jsonl:
+      {"event":"deprecate","asset_id":"...","reason":"confidence dropped below 0.50","last_confidence":...,"trigger_result":"..."}
 
   写入 evolution.jsonl:
   {"event":"validate","asset_id":"...","result":"...","evidence":"session原文摘录","confidence_delta":...,"new_confidence":...}
