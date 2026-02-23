@@ -1,10 +1,17 @@
 ---
 name: madness
+license: MIT
 description: >
-  Use when user invokes /madness or /madness final for project-level retrospective.
-  Use /madness for mid-review, /madness final for end-of-project review.
-  Also: if .retro/state.json exists in project root and last_review_at exceeds the configured
-  review_interval_days, remind user at session start: "距上次复盘已过 N 天，建议 /madness"
+  Use when user invokes /madness or /madness final for project-level AI collaboration
+  retrospective with bidirectional feedback loop. Three modes: /madness on first run
+  triggers init (baseline analysis), subsequent /madness triggers mid-review (diagnose +
+  learn), /madness final triggers end-of-project review (learn + diagnose + cross-project
+  methodology). Core capabilities: (1) Gene/SOP/Pref structured asset system with
+  confidence lifecycle and evolution audit trail, (2) Socratic questioning with 4 rounds
+  including trigger distillation, (3) CLAUDE.md rule injection via Reflection (merge/
+  absorb/replace, not stacking), (4) Cross-team sharing via portable.json. Also: if
+  .retro/state.json exists in project root and last_review_at exceeds review_interval_days,
+  remind user at session start.
 ---
 
 # /madness — 项目级会话复盘
