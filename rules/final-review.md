@@ -8,6 +8,19 @@
 - 所有中期复盘 MD（.retro/reviews/*-mid.md）
 - 项目最终产出物清单（扫描项目目录）
 
+## 执行：阶段 A.0 — Gene 验证与偏离检测
+
+> 在常规两阶段分析之前执行。如果 memory/ 不存在或无活跃资产 → 跳过此阶段。
+
+加载 [rules/validation-protocol.md](validation-protocol.md) 执行：
+
+1. **Gene 验证**：对所有 active/provisional 资产，检查全部 facet 中是否有匹配场景，验证遵守情况和效果
+2. **偏离检测**：检查 SOP 偏离、Pref 偏离、新模式发现
+3. **弹药准备**：将验证发现传递给苏格拉底质询
+4. **产出**：Gene 验证报告（追加到分析报告最前面）
+
+验证完成后，更新 memory/ 中资产的 confidence 和 status。
+
 ## 执行：聚合分析
 
 ### 分析组 A：学习组（主线，先执行）
@@ -126,6 +139,9 @@
 
 ---
 
+### Gene 验证报告
+（格式见 [validation-protocol.md](validation-protocol.md) 的「输出」section）
+
 ### 项目成果
 - 交付了什么（列出关键产出物）
 - 质量评估（基于后期 session 的 outcome 达成率）
@@ -158,6 +174,11 @@
 
 ### 沉淀到 memory 的内容
 - [将要写入 memory/ 的方法论摘要，供用户确认]
+
+### 跨团队共享包
+- 导出资产数量：N 条 Gene + M 条 SOP + K 条 Pref
+- 导出文件：memory/exports/portable.json
+- 接收方挂载方式：复制 portable.json 到自己的 memory/exports/，下次 /madness 时自动检测并提示导入
 ```
 
 ## 确认话术
@@ -175,10 +196,25 @@ Summary 展示后，必须询问：
 ```
 1. 写入 .retro/reviews/YYYY-MM-DD-final.md（完整分析）
 2. 更新 state.json
-3. 将「可复用方法论」和「不熟悉领域行动清单」写入 memory/ 目录：
-   - 如果 memory/ 下已有相关主题文件，追加/更新
-   - 如果没有，创建新文件并在 MEMORY.md 中添加索引
-4. 提示用户：「总复盘完成。如需清理 .retro/ 目录可手动删除，或保留供下个项目参考。」
+3. 执行 Step 6（Gene 化 + CLAUDE.md 注入）→ 加载 [rules/gene-protocol.md](gene-protocol.md)
+4. 生成 portable.json 导出包：
+   - 筛选 memory/ 中 status=active 且 confidence ≥ 0.70 的资产
+   - 将 confidence 重置为 portable_confidence = 0.60
+   - 将 status 设为 "provisional"
+   - 保留 original_confidence 字段供接收方参考
+   - 写入 memory/exports/portable.json:
+     {
+       "schema_version": "1.0",
+       "exported_at": "YYYY-MM-DD",
+       "exported_by": "大锅",
+       "source_project": "[项目名]",
+       "assets": { "genes": [...], "sops": [...], "prefs": [...] }
+     }
+5. 提示用户：
+   「总复盘完成。
+   - memory/ 下的资产已更新，CLAUDE.md 已注入最新规则集
+   - portable.json 已生成，可发给同事供其项目挂载
+   - 如需清理 .retro/ 目录可手动删除，memory/ 建议保留供下个项目继承」
 ```
 
 ## 质量自检（输出前必须过）
@@ -189,6 +225,9 @@ Summary 展示后，必须询问：
 - [ ] "如果重新开始"部分有具体 Phase+步骤+检查点？
 - [ ] 是否先展示给用户确认，而非直接写入文件？
 - [ ] 对照 [bad-cases.md](bad-cases.md) 中的 5 条自检规则？
+- [ ] 如果存在活跃资产，是否执行了阶段 A.0 验证？
+- [ ] portable.json 中的 confidence 是否已重置为 0.60？
+- [ ] portable.json 中的 status 是否全部为 "provisional"？
 
 ## 注意事项
 
