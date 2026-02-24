@@ -16,13 +16,14 @@
 用子智能体批量提取 facet 后，做以下聚合：
 
 **1. 基础统计**
+
+运行聚合脚本获取结构化统计数据：
+```bash
+python3 scripts/aggregate_facets.py --retro-dir .retro
 ```
-- 按 goal_category 分组，统计每组 session 数
-- 按 outcome 统计分布
-- 按 date 统计每日会话数
-- 汇总 friction 出现频次，排序取 Top 5
-- 统计 loop_detected=true 的比例
-```
+→ 输出 JSON 含：by_goal_category、by_outcome、by_date、friction_top5、loop_rate、loop_sessions、ai_collab_summary、tools_distribution、avg_duration_min、total_files_changed
+
+子智能体基于脚本输出做解读和模式识别（脚本只做计数，不做归因）。
 
 **2. 时间线重建**
 ```
@@ -32,10 +33,15 @@
 ```
 
 **3. 产出盘点**
+
+运行产出物扫描脚本：
+```bash
+python3 scripts/scan_artifacts.py \
+  --project-dir . --last-review-at 1970-01-01
 ```
-- 列出项目目录下所有产出文件
-- 按类型分类（报告/数据/可视化/工具/文档）
-```
+→ 输出新增文件列表、按类型分类（报告/数据/可视化/工具/文档）、总大小
+
+注意：init 模式使用 1970-01-01 作为基准日期，扫描全部文件。
 
 ### 阶段 B: 深度归因分析（子智能体并行）
 

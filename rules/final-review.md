@@ -12,9 +12,15 @@
 
 > 在常规两阶段分析之前执行。如果 memory/ 不存在或无活跃资产 → 跳过此阶段。
 
-加载 [validation-protocol.md](validation-protocol.md) 执行：
+先运行结构化验证脚本（使用全部 facet，不加 --since 过滤）：
+```bash
+python3 scripts/validate_genes.py \
+  --memory-dir ./memory --retro-dir .retro
+```
 
-1. **Gene 验证**：对所有 active/provisional 资产，检查全部 facet 中是否有匹配场景，验证遵守情况和效果
+然后加载 [validation-protocol.md](validation-protocol.md) 补充语义验证：
+
+1. **Gene 验证**：基于脚本输出的 evidence_sessions，回到原始会话验证遵守情况和效果
 2. **偏离检测**：检查 SOP 偏离、Pref 偏离、新模式发现
 3. **弹药准备**：将验证发现传递给苏格拉底质询
 4. **产出**：Gene 验证报告（追加到分析报告最前面）
@@ -73,6 +79,8 @@
 ```
 
 ### 分析组 B：诊断组（辅线，后执行）
+
+> **数据基础**：运行 `python3 scripts/aggregate_facets.py --retro-dir .retro` 获取全量聚合统计。以下分析基于脚本输出 + 子智能体深度归因。
 
 **1. 全程摩擦热力图**
 
@@ -198,18 +206,11 @@ Summary 展示后，必须询问：
 2. 更新 state.json
 3. 执行 Step 6（Gene 化 + CLAUDE.md 注入）→ 加载 [gene-protocol.md](gene-protocol.md)
 4. 生成 portable.json 导出包：
-   - 筛选 memory/ 中 status=active 且 confidence ≥ 0.70 的资产
-   - 将 confidence 重置为 portable_confidence = 0.60
-   - 将 status 设为 "provisional"
-   - 保留 original_confidence 字段供接收方参考
-   - 写入 memory/exports/portable.json:
-     {
-       "schema_version": "1.0",
-       "exported_at": "YYYY-MM-DD",
-       "exported_by": "大锅",
-       "source_project": "[项目名]",
-       "assets": { "genes": [...], "sops": [...], "prefs": [...] }
-     }
+   python3 scripts/manage_assets.py export-portable --min-confidence 0.70 --memory-dir ./memory
+   → 自动筛选 active 且 confidence≥0.70 的资产
+   → confidence 重置为 0.60，status 设为 "provisional"
+   → 保留 original_confidence 字段
+   → 写入 memory/exports/portable.json
 5. 提示用户：
    「总复盘完成。
    - memory/ 下的资产已更新，CLAUDE.md 已注入最新规则集
@@ -228,6 +229,7 @@ Summary 展示后，必须询问：
 - [ ] 如果存在活跃资产，是否执行了阶段 A.0 验证？
 - [ ] portable.json 中的 confidence 是否已重置为 0.60？
 - [ ] portable.json 中的 status 是否全部为 "provisional"？
+- [ ] 运行报告红线自检：`python3 scripts/check_report.py --file REPORT_FILE` 确认 score ≥ 80？
 
 ## 注意事项
 
