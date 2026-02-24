@@ -76,32 +76,51 @@ def extract_keywords(text: str) -> set[str]:
     return set(words)
 
 
-def match_facet_to_asset(facet: dict, asset: dict) -> bool:
-    """Check if a facet matches an asset via keyword overlap."""
-    # Condition 1: goal_category matches asset domain tags
+def match_facet_to_asset(facet: dict, asset: dict) -> str:
+    """Score facet-asset match using weighted conditions. Returns 'high'|'medium'|'low'|'none'."""
+    score = 0
+
+    # Condition 1: goal_category matches asset domain (+2)
     goal_cat = facet.get("goal_category", "")
     domains = asset.get("domain", [])
     if isinstance(domains, str):
         domains = [domains]
     if goal_cat and any(goal_cat.lower() in d.lower() or d.lower() in goal_cat.lower() for d in domains):
-        return True
+        score += 2
 
-    # Condition 2: friction keywords relate to trigger
+    # Condition 2: friction keywords match trigger (+2)
     trigger_kw = extract_keywords(asset.get("trigger", ""))
     frictions = facet.get("friction", [])
     if isinstance(frictions, str):
         frictions = [frictions]
     for friction in frictions:
         if trigger_kw & extract_keywords(friction):
-            return True
+            score += 2
+            break
 
-    # Condition 3: goal contains keywords from title
+    # Condition 3: goal/title keyword overlap (each +1, max 3)
     title_kw = extract_keywords(asset.get("title", ""))
     goal_kw = extract_keywords(facet.get("goal", ""))
-    if title_kw and goal_kw and len(title_kw & goal_kw) >= 1:
-        return True
+    if title_kw and goal_kw:
+        overlap_count = len(title_kw & goal_kw)
+        score += min(overlap_count, 3)
 
-    return False
+    # Condition 4: learning/key_decision match trigger (+1)
+    if trigger_kw:
+        learning_kw = extract_keywords(facet.get("learning", ""))
+        decision_kw = extract_keywords(facet.get("key_decision", ""))
+        if (learning_kw & trigger_kw) or (decision_kw & trigger_kw):
+            score += 1
+
+    # Scoring thresholds
+    if score >= 4:
+        return "high"
+    elif score >= 2:
+        return "medium"
+    elif score >= 1:
+        return "low"
+    else:
+        return "none"
 
 
 def compute_compliance(asset: dict, matched_facets: list[dict]) -> tuple[str, float]:
@@ -175,16 +194,29 @@ def clamp(value: float, lo: float = 0.0, hi: float = 1.0) -> float:
 def validate(assets: list[dict], facets: list[dict]) -> dict:
     """Run validation protocol on all assets against facets."""
     results = []
+    validated_highlights = []
     summary = {"validated": 0, "weak_validated": 0, "ineffective": 0, "no_match": 0, "over_scoped": 0}
 
     for asset in assets:
         aid = asset.get("id", "unknown")
         atype = asset.get("asset_type", "gene")
         atitle = asset.get("title", "")
+        astatus = asset.get("status", "provisional")
         current_conf = float(asset.get("confidence", 0.5))
 
-        # Step 1: Scene matching
-        matched_facets = [f for f in facets if match_facet_to_asset(f, asset)]
+        # Step 1: Scene matching with three-level scoring
+        high_facets = []
+        medium_facets = []
+        for f in facets:
+            level = match_facet_to_asset(f, asset)
+            if level == "high":
+                high_facets.append(f)
+            elif level == "medium":
+                medium_facets.append(f)
+
+        matched_facets = high_facets + medium_facets
+        needs_semantic_review = len(high_facets) == 0 and len(medium_facets) > 0
+
         matched_ids = list({f.get("session_id", f.get("id", "")) for f in matched_facets if f.get("session_id") or f.get("id")})
 
         if not matched_facets:
@@ -208,16 +240,50 @@ def validate(assets: list[dict], facets: list[dict]) -> dict:
         outcome = most_common_outcome(matched_facets)
         key = (compliance, outcome)
         judgment, delta = JUDGMENT_MATRIX.get(key, ("inconclusive", 0.0))
+
+        # Exploration mode exemption
+        explore_count = sum(1 for f in matched_facets if f.get("goal_category") == "explore_learn")
+        exploration_exempt = False
+        if explore_count > len(matched_facets) / 2 and compliance == "non_compliant":
+            compliance = "exploration_exempt"
+            judgment = "exploration_exempt"
+            delta = 0.0
+            exploration_exempt = True
+
         new_conf = clamp(round(current_conf + delta, 4))
 
-        results.append({
+        result_entry = {
             "asset_id": aid, "asset_type": atype, "asset_title": atitle,
             "match_status": "matched", "matched_sessions": matched_ids,
             "compliance": compliance, "judgment": judgment,
             "suggested_delta": delta,
             "current_confidence": current_conf, "new_confidence": new_conf,
             "evidence_sessions": matched_ids[:5],
-        })
+            "exploration_exempt": exploration_exempt,
+        }
+        if needs_semantic_review:
+            result_entry["needs_semantic_review"] = True
+        results.append(result_entry)
+
+        # Collect validated_highlights
+        # Type 1: promotion_candidate — provisional asset validated with confidence increase
+        if astatus == "provisional" and new_conf > current_conf:
+            validated_highlights.append({
+                "type": "promotion_candidate",
+                "asset_id": aid,
+                "asset_title": atitle,
+                "old_confidence": current_conf,
+                "new_confidence": new_conf,
+            })
+
+        # Type 2: compliance_success — active asset complied with, outcome fully_achieved
+        if astatus == "active" and compliance == "compliant" and outcome == "fully_achieved":
+            validated_highlights.append({
+                "type": "compliance_success",
+                "asset_id": aid,
+                "asset_title": atitle,
+                "evidence_session": matched_ids[0] if matched_ids else "",
+            })
 
         # Update summary
         if judgment == "validated":
@@ -233,6 +299,7 @@ def validate(assets: list[dict], facets: list[dict]) -> dict:
         "validated_at": date.today().isoformat(),
         "total_assets": len(assets),
         "results": results,
+        "validated_highlights": validated_highlights,
         "summary": summary,
     }
 

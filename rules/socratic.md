@@ -4,7 +4,7 @@
 
 ## 前置：证据构建（内部执行，不展示）
 
-从 facet 的 `ai_collab` 字段 + 原始 session 中寻找三类嫌疑：
+从 facet 的 `ai_collab` 字段 + 原始 session 中寻找五类嫌疑：
 
 **阿谀陷阱 (Sycophancy Trap)**
 用户问了引导性问题（"这样是不是更好？""用户应该会喜欢吧？"），AI 顺着说了。
@@ -18,8 +18,28 @@
 直接问"怎么解决"而不是"为什么出错"。
 → 标志：ai_collab.lazy_prompting 有值
 
+**自动化投降 (Automation Surrender)**
+AI 给出代码/方案后直接使用，未验证正确性、未检查边界条件、未理解底层逻辑。
+→ 标志：ai_collab.automation_surrender 有值
+
+**锚定效应 (Anchoring Effect)**
+被 AI 给出的第一个方案锚定思维，未探索替代方案、未质疑是否最优。
+→ 标志：ai_collab.anchoring_effect 有值
+
 如果 facet 中证据不足，回到原始 session 数据补充。
 构建至少 3 条"起诉书"后进入质询。
+
+## 可选 Round 0.5: 亮点确认
+
+> 在攻击性质询前，先用 1-2 句话确认正向行为。降低用户防御心理。
+
+IF 本轮有 validated_highlights（来自阶段 A.0）:
+  用 1-2 句话确认亮点，例如：
+  「大锅，这轮做得好的：[asset_title] 规则你执行到位了，效果也验证了。」
+  不展开讨论，快速进入 Round 1。
+
+IF 无 validated_highlights:
+  跳过，直接进入 Round 1。
 
 ## 执行：3 轮质询
 
@@ -36,6 +56,8 @@
 - 「从 [A] 到 [B]，中间的推导过程呢？补上。」
 - 「你说你懂了 [X]，不看 AI 代码，你能从零说出思路吗？」
 - 「这个结论是你从数据中发现的，还是 AI 说的你就信了？」
+- 「AI 给了你 [X] 方案，你验证过它的正确性吗？还是直接 copy-paste 了？」
+- 「你用了 AI 第一个建议的 [方案]。你考虑过替代方案吗？还是被第一印象锚定了？」
 
 ### 流程
 

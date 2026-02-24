@@ -71,10 +71,12 @@ python3 scripts/validate_genes.py \
 
 ```
 - 统计 tools_used 使用分布，交叉分析 tools_used × outcome
-- 从 ai_collab 字段提取三类协作问题：
+- 从 ai_collab 字段提取五类协作问题：
   - 阿谀陷阱：引导性问题被 AI 顺从的场景
   - 逻辑跳跃：从 A 跳到 C 缺乏推导的场景
   - 思维偷懒：直接要答案不问为什么的场景
+  - 自动化投降：不验证 AI 输出直接使用的场景
+  - 锚定效应：被 AI 第一个方案锚定、未探索替代方案的场景
 - 输出：
   「AI 用得好的模式 → 协作中的认知陷阱 → 具体场景引用 → 纠偏建议」
 - 这些发现将作为苏格拉底质询（Step 5）的弹药
@@ -126,7 +128,19 @@ python3 scripts/scan_artifacts.py \
 - 如果没有失败 session，输出「本轮无认知纠偏事件」
 ```
 
-## 输出：Summary
+## 输出：摘要（≤500 字，先展示）
+
+先展示摘要，用户要求时再展示详情。
+
+```markdown
+## 本轮复盘摘要（MM-DD ~ MM-DD）
+**新 session**：N | **产出**：M | **循环**：X | **Gene 验证**：Y 条通过
+**一句话诊断**：[最大问题/最大亮点]
+**关键行动**：1. [...] 2. [...]
+> 输入「展开详情」查看完整报告。
+```（end template）
+
+## 输出：详情（用户要求时展示）
 
 按以下模板生成，**先展示给用户，确认后才存盘**：
 
@@ -138,7 +152,7 @@ python3 scripts/scan_artifacts.py \
 ---
 
 ### Gene 验证报告
-（如果执行了阶段 A.0，在此展示验证结果表格、偏离告警、新 Gene 候选。格式见 [validation-protocol.md](validation-protocol.md) 的「输出」section。如未执行阶段 A.0 则省略此 section。）
+（如果执行了阶段 A.0，在此展示验证结果表格、**遵守亮点**、偏离告警、新 Gene 候选。格式见 [validation-protocol.md](validation-protocol.md) 的「输出」section。如未执行阶段 A.0 则省略此 section。）
 
 ### 做得好的
 - [1-2 条亮点]

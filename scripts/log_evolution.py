@@ -17,6 +17,8 @@ VALID_EVENTS = [
     "validate",
     "no_match",
     "inject_reflection",
+    "promoted_to_active",
+    "compliance_highlight",
 ]
 
 

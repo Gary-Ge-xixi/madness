@@ -138,7 +138,7 @@ description: >
    c. 验证并缓存：
       python3 scripts/validate_facet.py cache \
         --session-id SESSION_ID --input facet.json
-      → 自动验证 13 必填字段 + 枚举值 + ai_collab 结构，失败则报错
+      → 自动验证 13 必填字段 + 枚举值 + ai_collab 结构（5 类）+ extraction_confidence，失败则报错
 ```
 
 > 子智能体使用规则见上方「子智能体通用规则」段落。
@@ -164,8 +164,11 @@ description: >
   "ai_collab": {
     "sycophancy": "引导性问题+AI顺从的场景（如有）",
     "logic_leap": "跳过推导直接跳结论的场景（如有）",
-    "lazy_prompting": "直接要答案没问为什么的场景（如有）"
-  }
+    "lazy_prompting": "直接要答案没问为什么的场景（如有）",
+    "automation_surrender": "不验证AI输出直接使用的场景（如有）",
+    "anchoring_effect": "被AI第一个方案锚定思维、未探索替代方案的场景（如有）"
+  },
+  "extraction_confidence": 0.85
 }
 ```
 
@@ -181,6 +184,24 @@ description: >
 - `rework_from_poor_planning` — 规划不足导致返工
 - `ai_dependency` — 过度依赖 AI 导致认知偷懒
 - `other` — 其他（附说明）
+
+### Step 3b: Facet 质量抽检（仅 mid / final 模式，>5 个 facet 时）
+
+> 当本轮提取的 facet 数量 >5 个时，随机抽取 2 个展示给用户确认准确性。
+
+```
+IF uncached_count > 5:
+  randomly_pick 2 facets from newly cached
+  FOR each picked facet:
+    展示 facet 摘要（session_id + goal + goal_category + friction + ai_collab）
+    问用户：「大锅，这个 facet 提取准确吗？有需要修正的吗？」
+    用户确认 → 继续
+    用户修正 → 更新缓存后继续
+ELSE:
+  跳过抽检（facet 数量少，可在报告阶段一并确认）
+```
+
+目的：在大批量提取时尽早发现子智能体的系统性提取偏差。如果 2 个抽检中 ≥1 个有重大偏差，应复核全部 facet。
 
 ### Step 4: 聚合分析（仅 mid / final 模式，两阶段）
 
@@ -206,6 +227,8 @@ mid 和 final 模式执行**两阶段分析**，不允许一次成型：
   - 产出：带证据链的深度分析
 ```
 
+> **注意**：validate_genes.py 的匹配结果分 high/medium/low/none 四级。medium 级别需要 Claude 语义确认后才进入合规检测。
+
 - **mid 模式** → 加载 [rules/mid-review.md](rules/mid-review.md) 执行
 - **final 模式** → 加载 [rules/final-review.md](rules/final-review.md) 执行
 
@@ -214,7 +237,8 @@ mid 和 final 模式执行**两阶段分析**，不允许一次成型：
 > **注意**：init 模式的展示、质询和确认已在 Step 1.7-1.9 中执行，不走此步骤。
 
 ```
-1. 将完整报告展示给用户（中文）
+1. 先展示报告摘要（≤500 字）→ 问用户「展开详情？」→ 用户要求时展示完整报告
+   注意：苏格拉底质询无论用户是否看了详情，都必须执行。
 2. 苏格拉底质询 → 加载 rules/socratic.md 执行
    - 基于报告 + facet 中的 ai_collab + Gene 验证弹药，向用户发起 3 轮攻击性提问
    - 第 4 轮：触发条件提炼（含 Gene 验证中需修订的资产）
@@ -309,6 +333,25 @@ mid 和 final 模式执行**两阶段分析**，不允许一次成型：
 ## Bad Cases
 
 参见 [rules/bad-cases.md](rules/bad-cases.md)。执行时对照 bad case 自检，避免重蹈覆辙。
+
+## 大项目策略（>30 session）
+
+当项目 session 数超过 30 个时，采用以下策略缓解上下文溢出：
+
+### 批次处理
+- 每批处理 10-15 个 session
+- 每批独立执行 Step 3（facet 提取）+ 即时缓存
+- 不要试图在一个上下文中处理全部 session
+
+### 摘要传递
+- 使用 `aggregate_facets.py --output-file .retro/aggregate_cache.json` 持久化聚合结果
+- 子智能体读聚合文件而非重新计算
+- 每批完成后增量更新聚合缓存
+
+### 中间持久化
+- 每批 facet 提取后立即缓存（validate_facet.py cache）
+- 聚合分析结果写入文件，避免丢失
+- Step 4 的深度归因可分批执行，最终合并
 
 ## 语言
 

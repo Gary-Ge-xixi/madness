@@ -31,17 +31,27 @@ FOR each asset IN all_active_assets:
 
   === Step 1: 场景匹配 ===
   扫描本轮所有 facet，判断是否存在该 asset.trigger 描述的场景。
-  匹配依据：
-    - facet.goal_category 与 asset.domain/tags 的相关性
-    - facet.friction 与 asset.trigger 中条件的吻合度
-    - facet.goal 与 asset.title 的语义相关性
+  匹配采用两阶段流程：
 
-  IF 本轮无匹配场景
+  **阶段 1：脚本预筛选（三级匹配）**
+  validate_genes.py 基于加权评分自动分级：
+    - goal_category 匹配 asset.domain → +2
+    - friction 关键词匹配 trigger → +2
+    - goal/title 关键词重叠（每个 +1，最多 +3）
+    - learning/key_decision 匹配 trigger → +1
+  评分：≥4 → high，≥2 → medium，≥1 → low，0 → none
+
+  **阶段 2：Claude 语义确认（仅 medium 级别）**
+  - high：自动进入 Step 2 合规检测
+  - medium：needs_semantic_review=true，Claude 需人工确认后才进入 Step 2
+  - low/none：跳过
+
+  IF 本轮无匹配场景（全部为 low/none）
     THEN 跳过，记录：
     evolution.jsonl: {"event":"no_match","asset_id":"...","review_period":"MM-DD~MM-DD"}
     在验证报告中标注「无匹配场景」
 
-  IF 本轮有匹配场景 → 进入 Step 2
+  IF 本轮有匹配场景（high 或确认后的 medium）→ 进入 Step 2
 
   === Step 2: 遵守检测 ===
   在匹配场景的 session 原始数据中，检查 asset.method 中的步骤是否被执行。
@@ -95,6 +105,10 @@ FOR each asset IN all_active_assets:
       --event deprecate \
       --asset-id ASSET_ID \
       --details '{"reason":"confidence dropped below 0.50","last_confidence":0.48}'
+
+  探索模式豁免：
+    当匹配的 session 中 >50% 为 goal_category=explore_learn 时，
+    non_compliant 判定改为 exploration_exempt，confidence 不变。
 ```
 
 ## 执行：偏离检测
@@ -144,6 +158,11 @@ FOR each asset IN all_active_assets:
 | 资产 | 类型 | 本轮场景 | 遵守情况 | 效果 | 置信度变化 |
 |------|------|---------|---------|------|-----------|
 | [title] | gene/sop/pref | session [日期] [描述] | 已遵守/部分/未遵守 | [outcome] | X.XX → Y.YY |
+
+**遵守亮点**：
+- [asset_title]（provisional c:0.80→0.85）在 session [X] 中被正确执行，接近晋升为 active
+- [asset_title]（active c:0.92）在 session [Y] 中遵守且效果达成
+（如无亮点则标注「本轮无遵守亮点」）
 
 **偏离告警**：
 - [具体偏离描述 + 用户原话 + 改进建议]

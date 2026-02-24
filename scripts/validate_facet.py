@@ -89,11 +89,28 @@ def validate_facet(data):
     elif not isinstance(data["ai_collab"], dict):
         errors.append("Field 'ai_collab' must be a dict")
     else:
+        # Core 3 keys are required
         for key in ("sycophancy", "logic_leap", "lazy_prompting"):
             if key not in data["ai_collab"]:
                 errors.append(f"ai_collab missing key: {key}")
             elif not isinstance(data["ai_collab"][key], str):
                 errors.append(f"ai_collab.{key} must be a string")
+        # Extended 2 keys are optional (backward compatible: warn if missing)
+        for key in ("automation_surrender", "anchoring_effect"):
+            if key not in data["ai_collab"]:
+                warnings.append(f"ai_collab missing optional key: {key} (recommended for v2)")
+            elif not isinstance(data["ai_collab"][key], str):
+                errors.append(f"ai_collab.{key} must be a string")
+
+    # extraction_confidence (optional, warn if missing)
+    if "extraction_confidence" in data:
+        ec = data["extraction_confidence"]
+        if not isinstance(ec, (int, float)):
+            errors.append("Field 'extraction_confidence' must be a number")
+        elif not (0.0 <= ec <= 1.0):
+            errors.append(f"Field 'extraction_confidence' must be between 0.0 and 1.0, got {ec}")
+    else:
+        warnings.append("Missing optional field: extraction_confidence (recommended for quality tracking)")
 
     # domain_knowledge_gained
     if "domain_knowledge_gained" not in data:

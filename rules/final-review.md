@@ -126,17 +126,30 @@ python3 scripts/validate_genes.py \
 
 ```
 - 汇总全部 facet 的 ai_collab 字段
-- 按三类问题统计分布和演变趋势：
+- 按五类问题统计分布和演变趋势：
   - 阿谀陷阱：哪些阶段最容易被 AI 顺着说
   - 逻辑跳跃：哪些环节缺乏推导
   - 思维偷懒：哪类任务最容易直接要答案
+  - 自动化投降：哪些场景直接使用 AI 输出未验证
+  - 锚定效应：哪些决策被 AI 第一方案锚定
 - 交叉分析：ai_collab 问题 × outcome 的关系
 - 输出：
   「全项目 AI 协作模式画像 → 高危场景 → 认知依赖趋势」
 - 这些将作为苏格拉底质询和思维尸检的核心证据
 ```
 
-## 输出：Summary
+## 输出：摘要（≤500 字，先展示）
+
+```markdown
+## 项目总复盘摘要：[项目名]（MM-DD ~ MM-DD）
+**总 session**：N | **总耗时**：约 X 天 | **复盘次数**：M 次
+**一句话总结**：[最大收获/最大教训]
+**核心成果**：[1-2 句关键产出]
+**Top 行动**：1. [...] 2. [...]
+> 输入「展开详情」查看完整报告。
+```（end template）
+
+## 输出：详情（用户要求时展示）
 
 按以下模板生成，**先展示给用户，确认后才存盘**：
 
@@ -148,7 +161,7 @@ python3 scripts/validate_genes.py \
 ---
 
 ### Gene 验证报告
-（格式见 [validation-protocol.md](validation-protocol.md) 的「输出」section）
+（格式见 [validation-protocol.md](validation-protocol.md) 的「输出」section，包括**遵守亮点**、偏离告警、新 Gene 候选）
 
 ### 项目成果
 - 交付了什么（列出关键产出物）

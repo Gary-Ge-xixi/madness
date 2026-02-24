@@ -58,7 +58,7 @@ def check_evidence_quotes(text: str) -> dict:
     problem_count = max(len(problem_items) + len(numbered_items), 1)
 
     passed = quote_count >= problem_count
-    score = 20 if passed else min(20, int(20 * quote_count / problem_count))
+    score = 17 if passed else min(17, int(17 * quote_count / problem_count))
     detail = f"Found {quote_count} quotes for {problem_count} friction items"
     return {"rule": "evidence_quotes", "passed": passed, "score": score, "detail": detail}
 
@@ -88,7 +88,7 @@ def check_actionable_steps(text: str) -> dict:
     ratio = with_steps / total if total else 0
 
     passed = ratio >= 0.8
-    score = int(20 * min(ratio / 0.8, 1.0))
+    score = int(17 * min(ratio / 0.8, 1.0))
     detail = f"{with_steps}/{total} improvements have step indicators"
     return {"rule": "actionable_steps", "passed": passed, "score": score, "detail": detail}
 
@@ -107,16 +107,16 @@ def check_best_practice_scope(text: str) -> dict:
     scene_count = len(re.findall(r"\u573a\u666f", section))
 
     if has_applicable and has_not_applicable:
-        return {"rule": "best_practice_scope", "passed": True, "score": 20,
+        return {"rule": "best_practice_scope", "passed": True, "score": 17,
                 "detail": "Found both \u9002\u7528 and \u4e0d\u9002\u7528 scope indicators"}
     elif scene_count >= 2:
-        return {"rule": "best_practice_scope", "passed": True, "score": 20,
+        return {"rule": "best_practice_scope", "passed": True, "score": 17,
                 "detail": f"Found {scene_count} \u573a\u666f references indicating scope coverage"}
     elif has_applicable:
-        return {"rule": "best_practice_scope", "passed": False, "score": 10,
+        return {"rule": "best_practice_scope", "passed": False, "score": 8,
                 "detail": "Missing \u2018\u4e0d\u9002\u7528\u573a\u666f\u2019 in best practices section"}
     else:
-        return {"rule": "best_practice_scope", "passed": False, "score": 5,
+        return {"rule": "best_practice_scope", "passed": False, "score": 4,
                 "detail": "No scope indicators found in best practices section"}
 
 
@@ -135,7 +135,7 @@ def check_no_vague_language(text: str) -> dict:
 
     total_violations = sum(int(v.split("x")[1]) for v in violations)
     passed = total_violations == 0
-    score = max(0, 20 - total_violations * 4)
+    score = max(0, 17 - total_violations * 3)
     if passed:
         detail = "No vague phrases detected"
     else:
@@ -166,8 +166,26 @@ def check_two_phase_analysis(text: str) -> dict:
             indicators.append("\u9636\u6bb5 B")
         detail = f"Missing two-phase indicators. Found: {', '.join(indicators) or 'none'}"
 
-    score = 20 if passed else (10 if phase_a or phase_b else 0)
+    score = 17 if passed else (8 if phase_a or phase_b else 0)
     return {"rule": "two_phase_analysis", "passed": passed, "score": score, "detail": detail}
+
+
+def check_summary_detail_split(text: str) -> dict:
+    """Rule 6: Report should have summary/detail two-layer structure."""
+    has_summary = bool(re.search(r"摘要", text)) and bool(
+        re.search(r"一句话诊断|一句话总结", text)
+    )
+    has_detail = bool(re.search(r"详情|完整报告|展开详情", text))
+
+    if has_summary and has_detail:
+        return {"rule": "summary_detail_split", "passed": True, "score": 15,
+                "detail": "Found both summary and detail markers"}
+    elif has_summary:
+        return {"rule": "summary_detail_split", "passed": False, "score": 8,
+                "detail": "Found summary markers but missing detail markers"}
+    else:
+        return {"rule": "summary_detail_split", "passed": False, "score": 0,
+                "detail": "Missing summary/detail split markers"}
 
 
 def main():
@@ -186,6 +204,7 @@ def main():
         check_best_practice_scope(text),
         check_no_vague_language(text),
         check_two_phase_analysis(text),
+        check_summary_detail_split(text),
     ]
 
     total_score = sum(c["score"] for c in checks)
