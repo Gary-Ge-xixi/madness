@@ -50,10 +50,13 @@ def aggregate(facets):
                 "sycophancy_count": 0,
                 "logic_leap_count": 0,
                 "lazy_prompting_count": 0,
+                "automation_surrender_count": 0,
+                "anchoring_effect_count": 0,
             },
             "tools_distribution": {},
             "avg_duration_min": 0.0,
             "total_files_changed": 0,
+            "avg_extraction_confidence": None,
         }
 
     by_goal_category = Counter()
@@ -65,8 +68,12 @@ def aggregate(facets):
     sycophancy_count = 0
     logic_leap_count = 0
     lazy_prompting_count = 0
+    automation_surrender_count = 0
+    anchoring_effect_count = 0
     total_duration = 0.0
     total_files = 0
+    extraction_confidence_sum = 0.0
+    extraction_confidence_n = 0
 
     for facet in facets:
         by_goal_category[facet.get("goal_category", "unknown")] += 1
@@ -86,6 +93,15 @@ def aggregate(facets):
             logic_leap_count += 1
         if ai.get("lazy_prompting", ""):
             lazy_prompting_count += 1
+        if ai.get("automation_surrender", ""):
+            automation_surrender_count += 1
+        if ai.get("anchoring_effect", ""):
+            anchoring_effect_count += 1
+
+        ec = facet.get("extraction_confidence")
+        if isinstance(ec, (int, float)):
+            extraction_confidence_sum += ec
+            extraction_confidence_n += 1
 
         for tool in facet.get("tools_used", []):
             tools_counter[tool] += 1
@@ -110,10 +126,13 @@ def aggregate(facets):
             "sycophancy_count": sycophancy_count,
             "logic_leap_count": logic_leap_count,
             "lazy_prompting_count": lazy_prompting_count,
+            "automation_surrender_count": automation_surrender_count,
+            "anchoring_effect_count": anchoring_effect_count,
         },
         "tools_distribution": dict(tools_counter),
         "avg_duration_min": round(total_duration / total, 1) if total else 0.0,
         "total_files_changed": total_files,
+        "avg_extraction_confidence": round(extraction_confidence_sum / extraction_confidence_n, 3) if extraction_confidence_n else None,
     }
 
 
@@ -121,11 +140,20 @@ def main():
     parser = argparse.ArgumentParser(description="Aggregate statistics from cached facets")
     parser.add_argument("--retro-dir", default=".retro", help="Retro directory (default: .retro)")
     parser.add_argument("--since", default=None, help="Only include facets with date >= DATE (YYYY-MM-DD)")
+    parser.add_argument("--output-file", default=None, help="Write output to file instead of stdout (for large project batch processing)")
     args = parser.parse_args()
 
     facets = load_facets(args.retro_dir, since=args.since)
     result = aggregate(facets)
-    print(json.dumps(result, indent=2))
+    output = json.dumps(result, indent=2)
+
+    if args.output_file:
+        os.makedirs(os.path.dirname(args.output_file) if os.path.dirname(args.output_file) else ".", exist_ok=True)
+        with open(args.output_file, "w", encoding="utf-8") as f:
+            f.write(output)
+        print(f"Aggregation written to {args.output_file}", file=sys.stderr)
+    else:
+        print(output)
 
 
 if __name__ == "__main__":

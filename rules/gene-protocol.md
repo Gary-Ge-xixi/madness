@@ -24,6 +24,10 @@
   - evidence（至少 1 条 session 原话引用）
 
 缺失字段 → 回到报告/质询记录补充，不可跳过。
+
+建议新 Gene 添加探索豁免：
+  - 对于方法论类 Gene，建议添加 skip_when: "goal_category == 'explore_learn'"
+  - 用户可在 Step 6.1 确认时决定是否采纳此默认建议
 ```
 
 ## Step 6.2: 资产分类
