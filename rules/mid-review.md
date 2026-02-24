@@ -11,9 +11,15 @@
 
 > 在常规两阶段分析之前执行。如果 memory/ 不存在或无活跃资产 → 跳过此阶段。
 
-加载 [validation-protocol.md](validation-protocol.md) 执行：
+先运行结构化验证脚本：
+```bash
+python3 scripts/validate_genes.py \
+  --memory-dir ./memory --retro-dir .retro --since LAST_REVIEW_DATE
+```
 
-1. **Gene 验证**：对所有 active/provisional 资产，检查本轮 facet 中是否有匹配场景，验证遵守情况和效果
+然后加载 [validation-protocol.md](validation-protocol.md) 补充语义验证：
+
+1. **Gene 验证**：基于脚本输出的 evidence_sessions，回到原始会话验证遵守情况和效果
 2. **偏离检测**：检查 SOP 偏离、Pref 偏离、新模式发现
 3. **弹药准备**：将验证发现（遵守但无效、未遵守但成功、偏离）传递给苏格拉底质询
 4. **产出**：Gene 验证报告（追加到分析报告最前面）
@@ -23,6 +29,8 @@
 ## 执行：聚合分析
 
 ### 分析组 A：诊断（按顺序逐项分析）
+
+> **数据基础**：先运行 `python3 scripts/aggregate_facets.py --retro-dir .retro --since LAST_REVIEW_DATE` 获取聚合统计（goal_category 分布、friction Top5、loop_rate、ai_collab 统计等）。以下分析基于脚本输出 + 子智能体深度归因。
 
 **1. 循环检测**
 
@@ -74,9 +82,15 @@
 
 **6. 产出物变化**
 
+运行产出物扫描脚本：
+```bash
+python3 scripts/scan_artifacts.py \
+  --project-dir . --last-review-at LAST_REVIEW_DATE
 ```
-- 对比上次复盘以来的文件新增/修改情况
-- 统计新产出文件数量、类型分布（报告/数据/可视化/工具/文档）
+
+基于脚本输出：
+```
+- 解读新增/修改文件清单和类型分布
 - 评估产出物与本轮目标的匹配度
 - 输出：「新增了哪些产出 → 是否符合阶段预期 → 产出效率评估」
 - 在 Summary 的「做得好的」或「卡住的地方」中酌情引用产出数据
@@ -162,6 +176,7 @@ Summary 展示后，必须询问：
 - [ ] 对照 [bad-cases.md](bad-cases.md) 中的 5 条自检规则？
 - [ ] 如果存在活跃 Gene/SOP/Pref，是否执行了阶段 A.0 验证？
 - [ ] Gene 验证报告中每条判定是否有 session 原文证据？
+- [ ] 运行报告红线自检：`python3 scripts/check_report.py --file REPORT_FILE` 确认 score ≥ 80？
 
 ## 注意事项
 

@@ -46,15 +46,13 @@ description: >
    - Q2: 项目大概持续多久？（1周内 / 2-4周 / 1个月+）
      → 自动映射复盘间隔：2天 / 4天 / 7天
 
-2. 创建目录结构：
+2. 创建目录结构 + state.json：
+   ```bash
+   python3 scripts/manage_state.py init \
+     --project-name "用户回答的项目名" \
+     --interval DAYS \
+     --project-dir "当前项目根目录"
    ```
-   .retro/
-   ├── state.json
-   ├── facets/
-   └── reviews/
-   ```
-
-3. 写入 state.json（结构见下方）
 
 4. 检查项目 CLAUDE.md 是否已有复盘提醒行，没有则追加：
    ```
@@ -62,7 +60,16 @@ description: >
    如果 .retro/state.json 存在且距 last_review_at 超过 review_interval_days，在会话开头提醒："距上次复盘已过 N 天，建议 /madness"
    ```
 
-5. 扫描已有 session 建立基线，提取 facet 并缓存
+5. 扫描已有 session 建立基线：
+   ```bash
+   # 扫描新 session
+   python3 scripts/scan_sessions.py \
+     --state .retro/state.json --project-dir .
+
+   # 对每个 session，子智能体提取 facet 后验证并缓存
+   python3 scripts/validate_facet.py cache \
+     --session-id SESSION_ID --input facet.json
+   ```
 
 6. 基线分析 → 加载 [rules/init-baseline.md](rules/init-baseline.md) 执行两阶段分析
 
@@ -105,13 +112,14 @@ description: >
    - 扫描项目目录，建立对当前产出物的全景理解
    - 读取关键文件的结构和内容摘要
    - 理解项目处于什么阶段、做到了哪一步
-1. 读取 state.json，获取 sessions_analyzed_up_to
-2. 扫描 ~/.claude/projects/ 下当前项目的 JSONL 会话记录
-   - 只读取 sessions_analyzed_up_to 之后的新 session
-   - 过滤掉：子智能体 session、<2 条用户消息的 session
-3. 扫描项目工作目录：
-   - 列出自上次复盘以来新增/修改的文件
-   - 统计产出物变化（文件数、总大小变化）
+1. 扫描新 session：
+   python3 scripts/scan_sessions.py \
+     --state .retro/state.json --project-dir .
+   → 输出 JSON 数组到 stdout，包含 session_id、file_path、message_count、date
+2. 扫描产出物变化：
+   python3 scripts/scan_artifacts.py \
+     --project-dir . --last-review-at LAST_REVIEW_DATE
+   → 输出新增/修改文件清单和类型分布
 ```
 
 ### Step 3: Facet 提取（仅 mid / final 模式）
@@ -119,10 +127,18 @@ description: >
 对每个新 session 提取结构化 facet：
 
 ```
-对每个未缓存的 session：
-  1. 如果 session 内容 >30K 字符，分 25K 块摘要
-  2. 提取 facet（字段定义见下方）
-  3. 缓存到 .retro/facets/{session_id}.json
+1. 获取未缓存 session 列表：
+   python3 scripts/validate_facet.py list-uncached \
+     --sessions "$(python3 scripts/scan_sessions.py --state .retro/state.json --project-dir .)"
+   → 输出需要提取 facet 的 session 列表
+
+2. 对每个未缓存的 session：
+   a. 如果 session 内容 >30K 字符，分 25K 块摘要
+   b. 子智能体提取 facet（字段定义见下方）
+   c. 验证并缓存：
+      python3 scripts/validate_facet.py cache \
+        --session-id SESSION_ID --input facet.json
+      → 自动验证 13 必填字段 + 枚举值 + ai_collab 结构，失败则报错
 ```
 
 > 子智能体使用规则见上方「子智能体通用规则」段落。
@@ -175,8 +191,11 @@ mid 和 final 模式执行**两阶段分析**，不允许一次成型：
 > **术语澄清**：各模式的两阶段分析维度不同，具体见各 rules 文件。init 侧重「基线建立」（结构化提取 → 深度归因），mid 侧重「诊断 + 学习」，final 侧重「学习 + 诊断」。核心约束统一：必须先提取再归因，不允许一次成型。
 
 ```
-阶段 A: 结构化提取（子智能体并行）
-  - 提取 facet、统计分布、识别模式
+阶段 A: 结构化提取
+  - 运行聚合统计脚本：
+    python3 scripts/aggregate_facets.py --retro-dir .retro [--since LAST_REVIEW_DATE]
+    → 输出 JSON：goal_category 分布、outcome 分布、friction Top5、loop_rate、ai_collab 统计
+  - 子智能体基于聚合数据做初步诊断和模式识别
   - 产出：数据聚合 + 初步诊断
 
 阶段 B: 深度归因分析（子智能体并行）
@@ -206,7 +225,11 @@ mid 和 final 模式执行**两阶段分析**，不允许一次成型：
 5. 确认后：
    - 执行 Step 6（Gene 化 + CLAUDE.md 注入）
    - 写入 .retro/reviews/YYYY-MM-DD-{mid|final}.md
-   - 更新 state.json（last_review_at、reviews 数组、sessions_analyzed_up_to）
+   - 更新 state.json：
+     python3 scripts/manage_state.py update \
+       --last-review-at TODAY \
+       --sessions-up-to LAST_SESSION_ID \
+       --add-review mid|final
    - 如果是 final 模式，额外执行 portable.json 导出（见 [rules/final-review.md](rules/final-review.md) 沉淀逻辑）
 ```
 
@@ -222,11 +245,15 @@ mid 和 final 模式执行**两阶段分析**，不允许一次成型：
 具体流程：
 1. 收集 Gene 候选（来自质询第 4 轮 + 报告改进建议）
 2. 分类为 gene/sop/pref
-3. 写入 memory/ 对应 JSON 文件（confidence=0.70, status=provisional）
-4. 执行 CLAUDE.md 注入 Reflection（合并/吸收/替换/新增）
+3. 写入 memory/：
+   python3 scripts/manage_assets.py create \
+     --type gene|sop|pref --data '{"title":"...","domain":[...],"trigger":"...","method":[...]}'
+4. CLAUDE.md 注入 Reflection：
+   python3 scripts/inject_claudemd.py \
+     --claudemd ./CLAUDE.md --memory-dir ./memory --backup
 5. 生成领域视图 MD
 
-如果 memory/ 目录不存在 → 先执行 gene-protocol.md 中的目录初始化
+如果 memory/ 目录不存在 → 先运行 python3 scripts/init_memory.py --project-dir .
 
 如果本次复盘无 Gene 候选（全部「已澄清」或「待观察」）→ 跳过写入，仅执行验证结果的 confidence 更新
 ```

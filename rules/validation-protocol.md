@@ -11,7 +11,17 @@
 ## 执行：Gene 验证
 
 ```
+**先运行结构化验证脚本**（场景匹配 + 数值计算）：
+  python3 scripts/validate_genes.py \
+    --memory-dir ./memory \
+    --retro-dir .retro \
+    [--since LAST_REVIEW_DATE]
+  → 输出 validation_report.json：每个资产的匹配状态、合规度、判定、confidence delta
+
+**然后 Claude 补充语义验证**（脚本无法完成的部分）：
+
 输入：
+  - 脚本输出的 validation_report.json（含 evidence_sessions 列表）
   - memory/genes.json 中 status IN (active, provisional) 的全部 Gene
   - memory/sops.json 中 status IN (active, provisional) 的全部 SOP
   - memory/prefs.json 中 status IN (active, provisional) 的全部 Pref
@@ -65,22 +75,26 @@ FOR each asset IN all_active_assets:
   | 未遵守 | not_achieved | unrelated | 不变 | 无法归因 |
 
   === Step 4: 更新资产 ===
-  根据 Step 3 的判定，更新 memory/ 中的资产：
-    - confidence += delta
-    - validated_count += 1（如果 result 包含 validate）
-    - failed_count += 1（如果 result = ineffective）
-    - last_validated = today（如果通过）
-    - last_failed = today（如果失败）
+  根据 Step 3 的判定（结合脚本输出和 Claude 语义验证），更新资产：
 
-  状态转换：
-    - confidence ≥ 0.85 → status = "active"
-    - 0.50 ≤ confidence < 0.85 → status = "provisional"
-    - confidence < 0.50 → status = "deprecated"
-      写入 evolution.jsonl:
-      {"event":"deprecate","asset_id":"...","reason":"confidence dropped below 0.50","last_confidence":...,"trigger_result":"..."}
+  对每个验证结果，运行：
+    python3 scripts/manage_assets.py update \
+      --id ASSET_ID \
+      --confidence NEW_CONFIDENCE \
+      [--status active|provisional|deprecated]
+    → 脚本自动：version+1、状态转换（≥0.85→active, 0.50~0.84→provisional, <0.50→deprecated）
 
-  写入 evolution.jsonl:
-  {"event":"validate","asset_id":"...","result":"...","evidence":"session原文摘录","confidence_delta":...,"new_confidence":...}
+  记录验证事件：
+    python3 scripts/log_evolution.py \
+      --event validate \
+      --asset-id ASSET_ID \
+      --details '{"result":"validated","evidence":"session原文摘录","confidence_delta":0.05,"new_confidence":0.75}'
+
+  如果 deprecated：
+    python3 scripts/log_evolution.py \
+      --event deprecate \
+      --asset-id ASSET_ID \
+      --details '{"reason":"confidence dropped below 0.50","last_confidence":0.48}'
 ```
 
 ## 执行：偏离检测

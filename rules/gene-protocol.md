@@ -44,19 +44,34 @@ IF 候选描述的是「为什么选 A 不选 B」
 ## Step 6.3: 写入 memory/
 
 ```
-1. 读取 memory/{type}s.json（如 genes.json）
-   - 文件不存在 → 创建空数组 []
+对每个候选，运行脚本创建资产（自动处理 ID 生成、去重、版本号、evolution 记录）：
 
-2. 对每个候选：
-   a. 生成 id（kebab-case，从 title 派生）
-   b. 设置 version = 1, confidence = 0.70, status = "provisional"
-   c. 设置 validated_count = 1（本次复盘即首次验证）
-   d. 填充完整 Schema 字段（见下方 Schema 参考）
-   e. 追加到数组末尾
+python3 scripts/manage_assets.py create \
+  --type gene|sop|pref \
+  --data '{
+    "title": "一句话标题",
+    "domain": ["适用领域"],
+    "tags": [],
+    "trigger": "伪代码触发条件",
+    "skip_when": "伪代码跳过条件",
+    "method": ["步骤1", "步骤2"],
+    "checkpoint": "完成判定",
+    "expected_outcome": "预期效果",
+    "evidence": [{"project":"...","session":"...","quote":"用户原话","lesson":"..."}],
+    "created_from": "reviews/YYYY-MM-DD-type.md"
+  }'
 
-3. 写入 JSON 文件
-4. 记录 evolution.jsonl:
-   {"ts":"ISO8601","event":"create","asset_type":"...","asset_id":"...","from_review":"...","confidence":0.70}
+→ 脚本自动：
+  - 生成 kebab-case id（从 title 派生，自动去重）
+  - 设置 version=1, confidence=0.70, status="provisional"
+  - 追加到 memory/{type}s.json
+  - 记录 evolution.jsonl
+
+对 SOP 类型，将 method 替换为 steps：
+  --data '{"steps": [{"seq":1,"action":"...","checkpoint":"..."}]}'
+
+对 Pref 类型，将 method 替换为 rationale + tradeoff：
+  --data '{"rationale":"为什么选A不选B","tradeoff":"代价是什么"}'
 ```
 
 ### Gene Schema 参考
@@ -160,13 +175,24 @@ Step 3: 重写规则集
   - 附 1 行注释说明「为什么」
   - 格式：# RN [type:id, c:置信度, v:版本]
 
-Step 4: 写入 CLAUDE.md
-  替换 <!-- madness:memory-inject start --> 和 <!-- madness:memory-inject end --> 之间的内容
-  如果标记不存在 → 在文件末尾追加完整区间
+Step 4-5: 运行注入脚本（自动处理合并检测、规则重写、写入、审计）：
+  python3 scripts/inject_claudemd.py \
+    --claudemd ./CLAUDE.md \
+    --memory-dir ./memory \
+    --max-rules 10 \
+    --backup
+  → 脚本自动：
+    - 读取所有 active/provisional 资产（confidence≥0.50）
+    - 解析已有规则，执行 merge（同 id → version+1）
+    - 生成伪代码格式规则块（≤3 行/条）
+    - 替换 <!-- madness:memory-inject start/end --> 区间
+    - 备份原始 CLAUDE.md
+    - stdout 输出变更日志（merge/new/replace actions）
 
-Step 5: 审计
-  evolution.jsonl:
-  {"ts":"...","event":"inject_reflection","top10_before":[...],"delta":[...],"actions":[...],"top10_after":[...]}
+  注意：Reflection 的语义判断（合并 vs 吸收 vs 修订）仍由 Claude 执行。
+  脚本处理的是结构化 merge（同 id 匹配）。
+  对于需要语义判断的场景（如 trigger 描述同一场景但 id 不同），
+  Claude 应先通过 manage_assets.py update 调整资产，再运行注入脚本。
 ```
 
 ### CLAUDE.md 注入格式
@@ -212,12 +238,17 @@ FOR each domain:
 
 ## memory/ 目录初始化
 
-如果 memory/ 不存在（首次 Gene 化时），创建：
+如果 memory/ 不存在（首次 Gene 化时），运行初始化脚本：
 
+```bash
+python3 scripts/init_memory.py --project-dir .
+```
+
+→ 自动创建完整目录结构：
 ```
 memory/
 ├── index.json        # {"schema_version":"1.0","assets":{"genes":0,"sops":0,"prefs":0},"last_updated":""}
-├── INDEX.md          # # Memory 资产索引\n\n> 自动生成，请勿手动编辑\n\n暂无资产。
+├── INDEX.md          # # Memory 资产索引（自动生成）
 ├── genes.json        # []
 ├── sops.json         # []
 ├── prefs.json        # []
