@@ -58,8 +58,9 @@ git clone https://github.com/Gary-Ge-xixi/madness.git .claude/skills/madness
 
 侧重**诊断 + 学习**，纠偏当前方向：
 - 阶段 A.0：Gene 验证 — 验证已有规则的有效性
-- 诊断组：循环检测 → 效率瓶颈 → 决策质量 → 摩擦点 → AI 协作审计 → 产出物变化
+- 诊断组：循环检测 → 效率瓶颈 → 决策质量 → 摩擦点 → AI 协作审计（5 类）→ 产出物变化
 - 学习组：新认知清单 → 领域知识图谱 → 认知纠偏
+- 两层报告：先展示摘要（≤500 字），用户要求时展开详情
 - 苏格拉底质询 + Gene 化
 
 ### Final（总复盘）
@@ -67,7 +68,7 @@ git clone https://github.com/Gary-Ge-xixi/madness.git .claude/skills/madness
 侧重**学习 + 诊断**，沉淀跨项目方法论：
 - 阶段 A.0：全量 Gene 验证
 - 学习组：能力成长曲线 → 可复用方法论 → 领域知识全图 → 不熟悉领域应对策略
-- 诊断组：全程摩擦热力图 → 时间效率审计 → 循环模式 → 决策复盘 → AI 协作审计
+- 诊断组：全程摩擦热力图 → 时间效率审计 → 循环模式 → 决策复盘 → AI 协作审计（5 类）
 - 生成 portable.json 跨团队共享包
 
 ## 核心机制
@@ -111,6 +112,7 @@ git clone https://github.com/Gary-Ge-xixi/madness.git .claude/skills/madness
 ### 苏格拉底质询
 
 4 轮质询，不是温柔的总结，是逼用户面对思维盲区：
+- Round 0.5（可选）：亮点确认 — 先肯定后质疑，降低防御心理
 - 第 1-3 轮：攻击性提问（引用 session 原话，追问证据）
 - 第 4 轮：触发条件提炼 — 将隐性知识压成 IF/THEN 规则
 
@@ -130,10 +132,22 @@ madness/
 │   ├── init-baseline.md        # Init 模式两阶段分析
 │   ├── mid-review.md           # Mid 模式聚合分析
 │   ├── final-review.md         # Final 模式聚合分析 + portable.json
-│   ├── socratic.md             # 苏格拉底质询协议（含第 4 轮提炼）
+│   ├── socratic.md             # 苏格拉底质询协议（含 Round 0.5 + 第 4 轮提炼）
 │   ├── gene-protocol.md        # Gene 化执行协议 + CLAUDE.md Reflection
-│   ├── validation-protocol.md  # Gene 验证与偏离检测协议
-│   └── bad-cases.md            # 质量反面教材
+│   ├── validation-protocol.md  # Gene 验证与偏离检测协议（四级匹配）
+│   └── bad-cases.md            # 质量反面教材（6 条自检规则）
+├── scripts/
+│   ├── validate_facet.py       # Facet 验证与缓存（5 类 ai_collab + extraction_confidence）
+│   ├── validate_genes.py       # Gene 验证协议（四级匹配 + 探索豁免 + 正向反馈）
+│   ├── aggregate_facets.py     # Facet 聚合统计（含 --output-file 持久化）
+│   ├── check_report.py         # 报告质量红线自检（6 条规则，满分 100）
+│   ├── log_evolution.py        # 资产演化事件日志
+│   ├── manage_assets.py        # Gene/SOP/Pref 资产 CRUD
+│   ├── inject_claudemd.py      # CLAUDE.md 规则注入
+│   ├── manage_state.py         # state.json 状态管理
+│   ├── scan_sessions.py        # 会话扫描
+│   ├── scan_artifacts.py       # 产出物扫描
+│   └── init_memory.py          # memory/ 目录初始化
 └── docs/plans/                 # 设计文档与实现计划
 ```
 
@@ -158,14 +172,47 @@ memory/                         # 认知资产（可跨项目继承）
 
 ## 报告质量红线
 
-每份报告必须满足 4 条红线：
+每份报告必须满足 6 条红线（自动化检测，总分 100，阈值 80）：
 
 1. **诊断必须有证据** — 引用用户原话，不说空话
 2. **改进必须可执行** — 包含具体步骤 + 检查点 + 预期效果
 3. **最佳实践必须含 SOP** — 适用场景 + 做法 + 不适用场景
 4. **必须带用户成长** — 教用户如何避免，画出演进轨迹
+5. **两阶段分析结构** — 必须包含结构化提取 + 深度归因
+6. **摘要/详情分离** — 先展示 ≤500 字摘要，用户要求时展开详情
 
 ## 更新记录
+
+### v2.1.0 (2026-02-24) — 问题诊断与覆盖面分析
+
+**7 维度系统性修复：**
+
+- **AI 协作偏差扩展**：ai_collab 从 3 类扩展为 5 类
+  - 新增 `automation_surrender`（自动化投降：不验证 AI 输出直接使用）
+  - 新增 `anchoring_effect`（锚定效应：被 AI 第一个方案锚定思维）
+  - 向后兼容：旧 facet 仍 valid，缺失新字段给 warning
+
+- **语义匹配升级**：validate_genes.py 场景匹配从 bool 重构为四级（high/medium/low/none）
+  - 加权评分系统：goal_category +2 / friction +2 / keyword overlap +1~3 / learning +1
+  - medium 级别由 Claude 语义确认，解决关键词匹配准确性瓶颈
+
+- **正向反馈闭环**：新增 `validated_highlights` 输出
+  - `promotion_candidate`：provisional 资产验证通过将升为 active
+  - `compliance_success`：active 资产被遵守且效果达成
+  - 苏格拉底质询 Round 0.5：先肯定后质疑，降低用户防御心理
+
+- **两层报告结构**：降低认知过载
+  - 第一层：摘要（≤500 字）先展示，含一句话诊断 + 关键行动
+  - 第二层：详情（用户要求时展示）保留完整模板
+  - check_report.py 新增 Rule 6 检测摘要/详情分离
+
+- **探索模式豁免**：explore_learn 占比 >50% 时 non_compliant → exploration_exempt
+  - gene-protocol.md 建议新 Gene 添加 `skip_when: "goal_category == 'explore_learn'"`
+
+- **Facet 质量校验**：新增 `extraction_confidence` 字段 + Step 3b 抽检机制
+
+- **大项目策略**：>30 session 时批次处理 + 摘要传递 + 中间持久化
+  - aggregate_facets.py 新增 `--output-file` 参数
 
 ### v2.0.0 (2026-02-23) — 双向反馈闭环
 
