@@ -5,13 +5,9 @@ import argparse
 import json
 import os
 import sys
-import tempfile
-from datetime import date
 from pathlib import Path
 
-
-def today() -> str:
-    return date.today().isoformat()
+from lib import today_iso as today
 
 
 def retro_dir(project_dir: str) -> Path:
@@ -32,22 +28,11 @@ def read_state(project_dir: str) -> dict:
 
 
 def write_state_atomic(project_dir: str, data: dict) -> None:
-    """Write state.json atomically via temp file + rename."""
+    """Write state.json atomically via lib.write_json_atomic."""
+    from lib import write_json_atomic
     sp = state_path(project_dir)
     sp.parent.mkdir(parents=True, exist_ok=True)
-    fd, tmp_path = tempfile.mkstemp(dir=str(sp.parent), suffix=".tmp")
-    try:
-        with os.fdopen(fd, "w", encoding="utf-8") as f:
-            json.dump(data, f, indent=2)
-            f.write("\n")
-        os.rename(tmp_path, str(sp))
-    except Exception:
-        # Clean up temp file on failure
-        try:
-            os.unlink(tmp_path)
-        except OSError:
-            pass
-        raise
+    write_json_atomic(str(sp), data)
 
 
 def count_facets(project_dir: str) -> int:

@@ -122,21 +122,17 @@ python3 scripts/validate_genes.py \
   「Top 3 最差决策（或最迟的决策）+ 教训」
 ```
 
-**5. 全项目 AI 协作审计**
+**5-6. 全项目 AI 执行质量 + 协作审计**
 
-```
-- 汇总全部 facet 的 ai_collab 字段
-- 按五类问题统计分布和演变趋势：
-  - 阿谀陷阱：哪些阶段最容易被 AI 顺着说
-  - 逻辑跳跃：哪些环节缺乏推导
-  - 思维偷懒：哪类任务最容易直接要答案
-  - 自动化投降：哪些场景直接使用 AI 输出未验证
-  - 锚定效应：哪些决策被 AI 第一方案锚定
+> 加载 [_shared/ai-audit.md](_shared/ai-audit.md) 执行。
+
+final 模式特殊要求（全量视角）：
+- 按三类问题统计**分布和演变趋势**（哪些阶段最容易出问题）
+- 全程返工归因分布：user_change vs ai_deviation vs both 的比例 + 趋势
 - 交叉分析：ai_collab 问题 × outcome 的关系
-- 输出：
-  「全项目 AI 协作模式画像 → 高危场景 → 认知依赖趋势」
+- 输出：「全项目 AI 执行质量画像 → 高危场景 → AI 执行偏差趋势」
+- 输出：「全项目 AI 协作模式画像 → 高危场景 → 认知依赖趋势」
 - 这些将作为苏格拉底质询和思维尸检的核心证据
-```
 
 ## 输出：摘要（≤500 字，先展示）
 
@@ -215,6 +211,11 @@ Summary 展示后，必须询问：
 用户确认 Summary 后：
 
 ```
+0. 强制 memory/ 存在性检查：
+   IF memory/ 不存在:
+     警告：「总复盘必须先完成 Gene 化，但 memory/ 目录不存在。」
+     自动运行 python3 scripts/init_memory.py --project-dir .
+     然后继续执行下方流程
 1. 写入 .retro/reviews/YYYY-MM-DD-final.md（完整分析）
 2. 更新 state.json
 3. 执行 Step 6（Gene 化 + CLAUDE.md 注入）→ 加载 [gene-protocol.md](gene-protocol.md)
@@ -224,25 +225,62 @@ Summary 展示后，必须询问：
    → confidence 重置为 0.60，status 设为 "provisional"
    → 保留 original_confidence 字段
    → 写入 memory/exports/portable.json
-5. 提示用户：
+5. shared-memory 上推（仅当父目录有 shared-memory/ 时）：
+   ```
+   IF 父目录有 shared-memory/:
+     Step A: 检测候选
+       python3 scripts/sync_shared_memory.py \
+         --shared-memory-dir ../shared-memory \
+         --project-memory-dir ./memory \
+         --direction up
+       → 输出 push_candidates + conflicts
+
+     Step B: Reflection 比对（先比对，再更新）
+       对每个 push_candidate:
+         读取 shared-memory 目标文件中已有的规则段落
+         执行语义比对（类似 CLAUDE.md 注入的 Reflection 逻辑）：
+
+         IF 目标文件已有语义相同的规则（trigger 描述同一场景）
+           THEN 合并：用更精确的措辞重写该段落
+           更新 META.json 中该条目的 version + confidence + validated_by
+           evolution.jsonl: {"event":"merge_to_shared"}
+
+         ELIF 目标文件已有该规则的旧版本（同 id 但内容更新）
+           THEN 替换：用新版本覆盖旧段落
+           更新 META.json 版本号
+           evolution.jsonl: {"event":"update_shared"}
+
+         ELSE（完全新规则）
+           追加到目标文件对应 section
+           在 META.json 中新增条目
+           evolution.jsonl: {"event":"push_to_shared"}
+
+     Step C: 用户确认后执行写入
+       展示比对结果（合并 N 条 / 替换 N 条 / 新增 N 条）
+       用户确认后：
+       - 按 Step B 结果更新 shared-memory 文件
+       - 更新 META.json
+       - 项目 Gene 添加 "promoted_to_shared": true
+       - 记录 evolution.jsonl
+   ELSE:
+     跳过此步骤
+   ```
+6. 提示用户：
    「总复盘完成。
    - memory/ 下的资产已更新，CLAUDE.md 已注入最新规则集
    - portable.json 已生成，可发给同事供其项目挂载
    - 如需清理 .retro/ 目录可手动删除，memory/ 建议保留供下个项目继承」
 ```
 
-## 质量自检（输出前必须过）
+## 质量门控（展示前必须通过，不可跳过）
 
-- [ ] 每个摩擦/失败模式有 ≥1 条用户原话引用？
-- [ ] 每条改进/方法论有可执行 SOP（步骤+检查点）？
+> 加载 [_shared/quality-gate.md](_shared/quality-gate.md) 执行。
+
+final 模式额外自检项：
 - [ ] 成长曲线有具体事件和时间戳（不是"显著提升"）？
-- [ ] "如果重新开始"部分有具体 Phase+步骤+检查点？
-- [ ] 是否先展示给用户确认，而非直接写入文件？
-- [ ] 对照 [bad-cases.md](bad-cases.md) 中的 5 条自检规则？
 - [ ] 如果存在活跃资产，是否执行了阶段 A.0 验证？
 - [ ] portable.json 中的 confidence 是否已重置为 0.60？
 - [ ] portable.json 中的 status 是否全部为 "provisional"？
-- [ ] 运行报告红线自检：`python3 scripts/check_report.py --file REPORT_FILE` 确认 score ≥ 80？
 
 ## 注意事项
 

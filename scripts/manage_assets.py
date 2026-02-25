@@ -6,38 +6,18 @@ import json
 import os
 import re
 import sys
-import tempfile
-from datetime import datetime, timezone
 
+from lib import (
+    VALID_ASSET_TYPES,
+    VALID_STATUSES,
+    read_json_list,
+    type_to_filename,
+    utc_now_iso,
+    utc_today_iso,
+    write_json_atomic,
+)
 
-VALID_TYPES = ("gene", "sop", "pref")
-VALID_STATUSES = ("active", "provisional", "deprecated")
-
-
-def type_to_filename(asset_type):
-    return f"{asset_type}s.json"
-
-
-def read_json_file(filepath):
-    if not os.path.exists(filepath):
-        return []
-    with open(filepath, "r", encoding="utf-8") as f:
-        return json.load(f)
-
-
-def write_json_atomic(filepath, data):
-    dir_path = os.path.dirname(filepath)
-    os.makedirs(dir_path, exist_ok=True)
-    fd, tmp_path = tempfile.mkstemp(dir=dir_path, suffix=".tmp")
-    try:
-        with os.fdopen(fd, "w", encoding="utf-8") as f:
-            json.dump(data, f, ensure_ascii=False, indent=2)
-            f.write("\n")
-        os.replace(tmp_path, filepath)
-    except Exception:
-        if os.path.exists(tmp_path):
-            os.unlink(tmp_path)
-        raise
+VALID_TYPES = tuple(sorted(VALID_ASSET_TYPES))
 
 
 def append_evolution(memory_dir, entry):
@@ -82,9 +62,9 @@ def cmd_create(args):
         print("Error: --data must contain at least a 'title' field", file=sys.stderr)
         sys.exit(1)
 
-    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    today = utc_today_iso()
     filepath = os.path.join(args.memory_dir, type_to_filename(args.type))
-    existing = read_json_file(filepath)
+    existing = read_json_list(filepath)
     existing_ids = {a["id"] for a in existing}
 
     base_id = title_to_id(data["title"])
@@ -123,7 +103,7 @@ def cmd_create(args):
     write_json_atomic(filepath, existing)
 
     append_evolution(args.memory_dir, {
-        "ts": datetime.now(timezone.utc).isoformat(),
+        "ts": utc_now_iso(),
         "event": "create",
         "asset_type": args.type,
         "asset_id": asset_id,
@@ -141,7 +121,7 @@ def cmd_update(args):
 
     for asset_type in VALID_TYPES:
         filepath = os.path.join(args.memory_dir, type_to_filename(asset_type))
-        assets = read_json_file(filepath)
+        assets = read_json_list(filepath)
         for i, a in enumerate(assets):
             if a.get("id") == args.id:
                 found_file = filepath
@@ -181,7 +161,7 @@ def cmd_update(args):
     write_json_atomic(found_file, found_assets_list)
 
     append_evolution(args.memory_dir, {
-        "ts": datetime.now(timezone.utc).isoformat(),
+        "ts": utc_now_iso(),
         "event": "update",
         "asset_id": args.id,
         "changes": changes,
@@ -192,7 +172,7 @@ def cmd_update(args):
 
 def cmd_list(args):
     filepath = os.path.join(args.memory_dir, type_to_filename(args.type))
-    assets = read_json_file(filepath)
+    assets = read_json_list(filepath)
 
     if args.status:
         if args.status not in VALID_STATUSES:
@@ -220,7 +200,7 @@ def cmd_export_portable(args):
 
     for asset_type in VALID_TYPES:
         filepath = os.path.join(args.memory_dir, type_to_filename(asset_type))
-        assets = read_json_file(filepath)
+        assets = read_json_list(filepath)
         key = f"{asset_type}s"
         for a in assets:
             if a.get("status") == "active" and a.get("confidence", 0) >= min_conf:
@@ -241,7 +221,7 @@ def cmd_export_portable(args):
 
     portable = {
         "schema_version": "1.0",
-        "exported_at": datetime.now(timezone.utc).strftime("%Y-%m-%d"),
+        "exported_at": utc_today_iso(),
         "exported_by": "\u5927\u9505",
         "source_project": source_project,
         "assets": result_assets,

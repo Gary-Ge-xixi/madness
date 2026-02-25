@@ -8,8 +8,7 @@ import sys
 from datetime import date, datetime
 from pathlib import Path
 
-
-VALID_STATUSES = {"active", "provisional"}
+from lib import INJECTABLE_STATUSES, load_all_assets
 
 JUDGMENT_MATRIX = {
     ("compliant", "fully_achieved"):     ("validated",         +0.05),
@@ -22,26 +21,6 @@ JUDGMENT_MATRIX = {
     ("non_compliant", "partially_achieved"): ("inconclusive",   0.00),
     ("non_compliant", "not_achieved"):   ("unrelated",          0.00),
 }
-
-
-def load_assets(memory_dir: Path) -> list[dict]:
-    """Load active/provisional assets from genes.json, sops.json, prefs.json."""
-    assets = []
-    for filename, asset_type in [("genes.json", "gene"), ("sops.json", "sop"), ("prefs.json", "pref")]:
-        filepath = memory_dir / filename
-        if not filepath.exists():
-            continue
-        try:
-            with open(filepath, "r", encoding="utf-8") as f:
-                data = json.load(f)
-            items = data if isinstance(data, list) else data.get("items", data.get("assets", []))
-            for item in items:
-                item.setdefault("asset_type", asset_type)
-                if item.get("status") in VALID_STATUSES:
-                    assets.append(item)
-        except (json.JSONDecodeError, OSError) as e:
-            print(f"Warning: failed to read {filepath}: {e}", file=sys.stderr)
-    return assets
 
 
 def load_facets(retro_dir: Path, since: str | None) -> list[dict]:
@@ -329,7 +308,7 @@ def main():
             print(f"Error: --since must be in YYYY-MM-DD format, got: {args.since}", file=sys.stderr)
             sys.exit(1)
 
-    assets = load_assets(memory_dir)
+    assets = load_all_assets(str(memory_dir), statuses=INJECTABLE_STATUSES)
     if not assets:
         print("Warning: no active/provisional assets found", file=sys.stderr)
 

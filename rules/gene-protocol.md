@@ -48,6 +48,16 @@ IF 候选描述的是「为什么选 A 不选 B」
 ## Step 6.3: 写入 memory/
 
 ```
+前置检查（仅当父目录有 shared-memory/ 时）：
+  IF shared-memory/META.json 存在:
+    读取 META.json 的 rules 列表
+    对每个 Gene 候选，检查 shared-memory 中是否已有同类规则（相同 id 或语义相同 trigger）
+    IF 发现已有同类:
+      提示用户：「shared-memory 中已有类似规则 [rule_id]（来自 [source_project]）。
+      是合并到已有规则，还是作为独立 Gene 创建？」
+      用户选合并 → 更新已有 Gene 的 version + confidence
+      用户选独立 → 正常创建，标记 related_shared_rule: [rule_id]
+
 对每个候选，运行脚本创建资产（自动处理 ID 生成、去重、版本号、evolution 记录）：
 
 python3 scripts/manage_assets.py create \
