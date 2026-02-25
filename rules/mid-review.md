@@ -79,18 +79,33 @@ python3 scripts/validate_genes.py \
 
 **7. 产出物变化**
 
-运行产出物扫描脚本：
-```bash
-python3 scripts/scan_artifacts.py \
-  --project-dir . --last-review-at LAST_REVIEW_DATE
-```
+使用 Glob 扫描项目目录，找出自上次复盘以来新增/修改的文件：
+- 扫描项目根目录（排除 .git、.retro、node_modules、__pycache__、.venv）
+- 按类型分类（报告 .md/.txt、数据 .json/.csv、工具 .py/.ts、可视化 .png/.svg/.html）
+- 统计新增文件数量和类型分布
 
-基于脚本输出：
+基于扫描结果：
 ```
 - 解读新增/修改文件清单和类型分布
 - 评估产出物与本轮目标的匹配度
 - 输出：「新增了哪些产出 → 是否符合阶段预期 → 产出效率评估」
 - 在 Summary 的「做得好的」或「卡住的地方」中酌情引用产出数据
+```
+
+**8. Goal-Gap 分析**
+
+> 仅当 state.json 中 goals 非空时执行。
+
+```
+读取 state.json 的 goals 列表
+FOR each goal:
+  - 从本轮 facet 中匹配相关 session（goal_category + goal 关键词匹配）
+  - 评估进展：未开始 / 进行中 / 已达成 / 偏离
+  - 如果偏离：引用 facet 证据说明何时何因偏离
+输出：Goal-Gap 表格
+
+| 目标 | 优先级 | 进展 | 关键 session | 偏离原因（如有）|
+|------|-------|------|-------------|----------------|
 ```
 
 ### 分析组 B：学习（按顺序逐项分析）
@@ -131,6 +146,7 @@ python3 scripts/scan_artifacts.py \
 ## 本轮复盘摘要（MM-DD ~ MM-DD）
 **新 session**：N | **产出**：M | **循环**：X | **Gene 验证**：Y 条通过
 **一句话诊断**：[最大问题/最大亮点]
+**Goal-Gap**：N 个目标中 X 个在轨 / Y 个偏离（仅当 goals 非空）
 **关键行动**：1. [...] 2. [...]
 > 输入「展开详情」查看完整报告。
 ```（end template）
@@ -148,6 +164,14 @@ python3 scripts/scan_artifacts.py \
 
 ### Gene 验证报告
 （如果执行了阶段 A.0，在此展示验证结果表格、**遵守亮点**、偏离告警、新 Gene 候选。格式见 [validation-protocol.md](validation-protocol.md) 的「输出」section。如未执行阶段 A.0 则省略此 section。）
+
+### 目标进展（Goal-Gap）
+（仅当 state.json 中 goals 非空时展示）
+
+| 目标 | 优先级 | 进展 | 偏离原因 |
+|------|-------|------|---------|
+
+---
 
 ### 做得好的
 - [1-2 条亮点]

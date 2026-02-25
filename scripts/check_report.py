@@ -42,7 +42,7 @@ def find_section(text: str, keywords: list[str]) -> str:
 
 
 def check_evidence_quotes(text: str) -> dict:
-    """Rule 1: Friction/problem sections should contain user quotes."""
+    """Rule 1: Friction/problem sections should contain content-validated user quotes."""
     section = find_section(text, ["\u5361\u4f4f", "\u6469\u64e6", "\u5faa\u73af", "\u95ee\u9898"])
     if not section.strip():
         return {"rule": "evidence_quotes", "passed": False, "score": 0,
@@ -57,14 +57,26 @@ def check_evidence_quotes(text: str) -> dict:
     numbered_items = re.findall(r"^\d+[\.\uff0e\)]\s", section, re.MULTILINE)
     problem_count = max(len(problem_items) + len(numbered_items), 1)
 
+    ratio = quote_count / problem_count if problem_count else 0
+    base_score = min(10, int(10 * min(ratio, 1.0)))
+
+    # Check if quotes contain date/session identifiers
+    session_date_pattern = re.compile(
+        r"\u4f1a\u8bdd|session|\d{1,2}-\d{1,2}|\u7b2c.*\u8f6e"
+    )
+    quotes_with_id = sum(1 for q in quote_patterns if session_date_pattern.search(q))
+    id_ratio = quotes_with_id / len(quote_patterns) if quote_patterns else 0
+    bonus = 5 if id_ratio >= 0.5 else 0
+
+    score = min(15, base_score + bonus)
     passed = quote_count >= problem_count
-    score = 17 if passed else min(17, int(17 * quote_count / problem_count))
-    detail = f"Found {quote_count} quotes for {problem_count} friction items"
+    detail = (f"Found {quote_count} quotes for {problem_count} friction items; "
+              f"{quotes_with_id}/{len(quote_patterns)} quotes have session/date identifiers")
     return {"rule": "evidence_quotes", "passed": passed, "score": score, "detail": detail}
 
 
 def check_actionable_steps(text: str) -> dict:
-    """Rule 2: Improvement items should contain step indicators."""
+    """Rule 2: Improvement items should contain action verbs and checkpoints."""
     section = find_section(text, ["\u6539\u8fdb", "SOP", "\u884c\u52a8", "\u5efa\u8bae", "\u4e0b\u4e00\u6b65"])
     if not section.strip():
         return {"rule": "actionable_steps", "passed": False, "score": 0,
@@ -77,47 +89,62 @@ def check_actionable_steps(text: str) -> dict:
         return {"rule": "actionable_steps", "passed": False, "score": 5,
                 "detail": "No improvement items found in section"}
 
-    step_pattern = re.compile(
-        r"Step\s*\d|"
-        r"\u7b2c[\u4e00\u4e8c\u4e09\u56db\u4e94\u516d\u4e03\u516b\u4e5d\u5341]\u6b65|"
-        r"[\u2460\u2461\u2462\u2463\u2464\u2465\u2466\u2467\u2468\u2469]|"
-        r"\d\.\s"
+    action_verb_pattern = re.compile(
+        r"\u5b9a\u4e49|\u9a8c\u8bc1|\u8fd0\u884c|\u8f93\u51fa|\u68c0\u67e5|\u521b\u5efa|\u5220\u9664|\u4fee\u6539|\u6d4b\u8bd5|\u914d\u7f6e|\u90e8\u7f72|\u8fc1\u79fb|\u91cd\u6784|\u6dfb\u52a0|\u79fb\u9664|\u66f4\u65b0|\u786e\u8ba4|\u5ba1\u67e5"
     )
-    with_steps = sum(1 for item in items if step_pattern.search(item))
-    total = len(items)
-    ratio = with_steps / total if total else 0
+    checkpoint_pattern = re.compile(
+        r"\u68c0\u67e5\u70b9|\u9884\u671f\u6548\u679c|\u9a8c\u6536\u6807\u51c6|\u5224\u65ad\u6807\u51c6|\u5b8c\u6210\u6807\u5fd7"
+    )
 
-    passed = ratio >= 0.8
-    score = int(17 * min(ratio / 0.8, 1.0))
-    detail = f"{with_steps}/{total} improvements have step indicators"
+    with_action_verbs = 0
+    with_checkpoints = 0
+    for item in items:
+        verb_matches = action_verb_pattern.findall(item)
+        if len(verb_matches) >= 2:
+            with_action_verbs += 1
+        if checkpoint_pattern.search(item):
+            with_checkpoints += 1
+
+    total = len(items)
+    verb_ratio = with_action_verbs / total if total else 0
+    base_score = min(10, int(10 * min(verb_ratio / 0.8, 1.0)))
+
+    checkpoint_ratio = with_checkpoints / total if total else 0
+    bonus = 5 if checkpoint_ratio >= 0.5 else 0
+
+    score = min(15, base_score + bonus)
+    passed = verb_ratio >= 0.8
+    detail = (f"{with_action_verbs}/{total} items have >=2 action verbs; "
+              f"{with_checkpoints}/{total} items have checkpoint keywords")
     return {"rule": "actionable_steps", "passed": passed, "score": score, "detail": detail}
 
 
 def check_best_practice_scope(text: str) -> dict:
-    """Rule 3: Best practices should contain scope info (when to use / when not to use)."""
+    """Rule 3: Best practices should contain derivation process and scope boundaries."""
     section = find_section(text, ["\u6700\u4f73\u5b9e\u8df5", "\u6210\u529f\u6a21\u5f0f", "\u505a\u5f97\u597d"])
     if not section.strip():
         return {"rule": "best_practice_scope", "passed": False, "score": 0,
                 "detail": "\u672a\u627e\u5230\u201c\u6700\u4f73\u5b9e\u8df5/\u6210\u529f\u6a21\u5f0f\u201d\u76f8\u5173\u7ae0\u8282"}
 
-    has_applicable = bool(re.search(r"\u9002\u7528|\u4f55\u65f6\u7528|\u573a\u666f", section))
-    has_not_applicable = bool(re.search(r"\u4e0d\u9002\u7528|\u4f55\u65f6\u4e0d\u7528", section))
+    # Check for derivation process
+    derivation_pattern = re.compile(
+        r"\u4ece.*\u5b66\u5230|\u56e0\u6b64|\u6240\u4ee5|\u63a8\u5bfc|\u56e0\u4e3a.*\u6240\u4ee5|\u6839\u636e.*\u5f97\u51fa"
+    )
+    derivation_matches = derivation_pattern.findall(section)
+    derivation_score = min(8, len(derivation_matches) * 2)
 
-    # Softer check: "场景" appearing at least twice counts
-    scene_count = len(re.findall(r"\u573a\u666f", section))
+    # Check for scope boundary
+    scope_pattern = re.compile(
+        r"\u9002\u7528|\u4e0d\u9002\u7528|\u4f55\u65f6\u7528|\u4f55\u65f6\u4e0d\u7528|\u573a\u666f|\u8fb9\u754c"
+    )
+    scope_matches = scope_pattern.findall(section)
+    scope_score = min(7, len(scope_matches) * 2)
 
-    if has_applicable and has_not_applicable:
-        return {"rule": "best_practice_scope", "passed": True, "score": 17,
-                "detail": "Found both \u9002\u7528 and \u4e0d\u9002\u7528 scope indicators"}
-    elif scene_count >= 2:
-        return {"rule": "best_practice_scope", "passed": True, "score": 17,
-                "detail": f"Found {scene_count} \u573a\u666f references indicating scope coverage"}
-    elif has_applicable:
-        return {"rule": "best_practice_scope", "passed": False, "score": 8,
-                "detail": "Missing \u2018\u4e0d\u9002\u7528\u573a\u666f\u2019 in best practices section"}
-    else:
-        return {"rule": "best_practice_scope", "passed": False, "score": 4,
-                "detail": "No scope indicators found in best practices section"}
+    score = derivation_score + scope_score
+    passed = derivation_score >= 4 and scope_score >= 4
+    detail = (f"Derivation: {len(derivation_matches)} markers ({derivation_score}/8 pts); "
+              f"Scope: {len(scope_matches)} markers ({scope_score}/7 pts)")
+    return {"rule": "best_practice_scope", "passed": passed, "score": score, "detail": detail}
 
 
 def check_no_vague_language(text: str) -> dict:
@@ -135,7 +162,7 @@ def check_no_vague_language(text: str) -> dict:
 
     total_violations = sum(int(v.split("x")[1]) for v in violations)
     passed = total_violations == 0
-    score = max(0, 17 - total_violations * 3)
+    score = max(0, 15 - total_violations * 3)
     if passed:
         detail = "No vague phrases detected"
     else:
@@ -166,7 +193,7 @@ def check_two_phase_analysis(text: str) -> dict:
             indicators.append("\u9636\u6bb5 B")
         detail = f"Missing two-phase indicators. Found: {', '.join(indicators) or 'none'}"
 
-    score = 17 if passed else (8 if phase_a or phase_b else 0)
+    score = 13 if passed else (6 if phase_a or phase_b else 0)
     return {"rule": "two_phase_analysis", "passed": passed, "score": score, "detail": detail}
 
 
@@ -178,19 +205,56 @@ def check_summary_detail_split(text: str) -> dict:
     has_detail = bool(re.search(r"详情|完整报告|展开详情", text))
 
     if has_summary and has_detail:
-        return {"rule": "summary_detail_split", "passed": True, "score": 15,
+        return {"rule": "summary_detail_split", "passed": True, "score": 12,
                 "detail": "Found both summary and detail markers"}
     elif has_summary:
-        return {"rule": "summary_detail_split", "passed": False, "score": 8,
+        return {"rule": "summary_detail_split", "passed": False, "score": 6,
                 "detail": "Found summary markers but missing detail markers"}
     else:
         return {"rule": "summary_detail_split", "passed": False, "score": 0,
                 "detail": "Missing summary/detail split markers"}
 
 
+def check_goal_alignment(text: str, state_path: str = None) -> dict:
+    """Rule 7: Report should reference project goals if available."""
+    # Try to read state.json to get goals
+    goals = []
+    if state_path:
+        try:
+            with open(state_path, "r", encoding="utf-8") as f:
+                state = json.load(f)
+            goals = state.get("goals", [])
+        except (FileNotFoundError, json.JSONDecodeError, OSError):
+            pass
+
+    if not goals:
+        # No goals defined — auto pass
+        return {"rule": "goal_alignment", "passed": True, "score": 15,
+                "detail": "No goals defined in state.json — auto pass"}
+
+    mentioned = 0
+    for g in goals:
+        goal_text = g.get("goal", "") if isinstance(g, dict) else str(g)
+        # Extract keywords from goal (>=2 char words)
+        keywords = re.findall(r"[\w\u4e00-\u9fff]{2,}", goal_text.lower())
+        # Check if any keyword appears in the report
+        for kw in keywords:
+            if kw in text.lower():
+                mentioned += 1
+                break
+
+    total = len(goals)
+    ratio = mentioned / total if total else 0
+    passed = ratio >= 0.5
+    score = int(15 * min(ratio / 0.5, 1.0)) if not passed else 15
+    detail = f"{mentioned}/{total} project goals referenced in report"
+    return {"rule": "goal_alignment", "passed": passed, "score": score, "detail": detail}
+
+
 def main():
     parser = argparse.ArgumentParser(description="Quality check a retrospective report against red-line rules.")
     parser.add_argument("--file", default=None, help="Path to report file (reads stdin if omitted)")
+    parser.add_argument("--state-path", default=None, help="Path to state.json for goal alignment check")
     args = parser.parse_args()
 
     text = read_report(args.file)
@@ -205,6 +269,7 @@ def main():
         check_no_vague_language(text),
         check_two_phase_analysis(text),
         check_summary_detail_split(text),
+        check_goal_alignment(text, args.state_path),
     ]
 
     total_score = sum(c["score"] for c in checks)

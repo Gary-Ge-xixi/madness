@@ -52,14 +52,18 @@ IF .retro/ 存在 AND memory/ 不存在 AND .retro/reviews/ 下有历史复盘�
 
 如果 .retro/ 不存在，执行初始化：
 
-1. 问用户两个问题：
+1. 问用户三个问题：
    - Q1: 项目名称？（默认建议当前目录名）
    - Q2: 项目大概持续多久？（1周内 / 2-4周 / 1个月+）
      → 自动映射复盘间隔：2天 / 4天 / 7天
+   - Q3: 这个项目的核心目标是什么？（列出 1-3 个，每个用一句话描述）
+     → 存入 state.json 的 goals 字段
+     → 格式：[{"goal": "描述", "priority": "high|medium"}]
+     → 用户不想定义 → goals 留空 []，后续复盘可补充
 
 2. 创建目录结构 + state.json：
    ```bash
-   python3 scripts/manage_state.py init \
+   python3 scripts/lib.py state init \
      --project-name "用户回答的项目名" \
      --interval DAYS \
      --project-dir "当前项目根目录"
@@ -153,14 +157,24 @@ IF .retro/ 存在但 memory/ 不存在:
    - 扫描项目目录，建立对当前产出物的全景理解
    - 读取关键文件的结构和内容摘要
    - 理解项目处于什么阶段、做到了哪一步
+0.5. 目标更新检查：
+   读取 state.json 的 goals 字段
+   IF goals 为空:
+     提示用户：「大锅，state.json 中没有项目目标记录。补充 1-3 个目标？」
+     用户补充 → 更新 state.json（python3 scripts/lib.py state update --project-dir . --goals '[...]'）
+     用户跳过 → 继续，但在报告中标注「目标未定义，无法做 Goal-Gap 分析」
+   ELSE:
+     展示当前目标列表，问「目标有变化吗？」
+     变化 → 更新；无变化 → 继续
 1. 扫描新 session：
    python3 scripts/scan_sessions.py \
      --state .retro/state.json --project-dir .
    → 输出 JSON 数组到 stdout，包含 session_id、file_path、message_count、date
 2. 扫描产出物变化：
-   python3 scripts/scan_artifacts.py \
-     --project-dir . --last-review-at LAST_REVIEW_DATE
-   → 输出新增/修改文件清单和类型分布
+   使用 Glob 扫描项目目录，找出自上次复盘以来新增/修改的文件：
+   - 扫描项目根目录（排除 .git、.retro、node_modules、__pycache__、.venv）
+   - 按类型分类（报告 .md/.txt、数据 .json/.csv、工具 .py/.ts、可视化 .png/.svg/.html）
+   - 统计新增文件数量和类型分布
 ```
 
 ### Step 3: Facet 提取（仅 mid / final 模式）
@@ -235,7 +249,7 @@ ELSE:
    - 执行 Step 6（Gene 化 + CLAUDE.md 注入）
    - 写入 .retro/reviews/YYYY-MM-DD-{mid|final}.md
    - 更新 state.json：
-     python3 scripts/manage_state.py update \
+     python3 scripts/lib.py state update \
        --last-review-at TODAY \
        --sessions-up-to LAST_SESSION_ID \
        --add-review mid|final
@@ -262,7 +276,7 @@ ELSE:
      --claudemd ./CLAUDE.md --memory-dir ./memory --backup
 5. 生成领域视图 MD
 
-如果 memory/ 目录不存在 → 先运行 python3 scripts/init_memory.py --project-dir .
+如果 memory/ 目录不存在 → 先运行 python3 scripts/manage_assets.py init --project-dir .
 
 如果本次复盘无 Gene 候选（全部「已澄清」或「待观察」）→ 跳过写入，仅执行验证结果的 confidence 更新
 ```
@@ -281,6 +295,9 @@ ELSE:
   "sessions_analyzed_up_to": "最后分析的session文件名或时间戳",
   "total_sessions": 0,
   "total_facets_cached": 0,
+  "goals": [
+    {"goal": "一句话描述", "priority": "high|medium"}
+  ],
   "reviews": [
     {
       "type": "init | mid | final",

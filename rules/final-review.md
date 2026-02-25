@@ -78,6 +78,23 @@ python3 scripts/validate_genes.py \
     Step 3: ...
 ```
 
+**5. 目标达成评估**
+
+> 仅当 state.json 中 goals 非空时执行。
+
+```
+读取 state.json 的 goals 列表
+FOR each goal:
+  - 全量 facet 匹配 + 全部中期复盘引用
+  - 最终评定：完全达成 / 部分达成 / 未达成 / 目标已变更
+  - 如果未达成：根因分析（基于 friction + loop 数据）
+  - 如果目标变更：追溯变更时间和原因
+输出：目标达成总表 + 未达成目标的改进路径
+
+| 目标 | 优先级 | 评定 | 达成度 | 根因/备注 |
+|------|-------|------|--------|----------|
+```
+
 ### 分析组 B：诊断组（辅线，后执行）
 
 > **数据基础**：运行 `python3 scripts/aggregate_facets.py --retro-dir .retro` 获取全量聚合统计。以下分析基于脚本输出 + 子智能体深度归因。
@@ -214,7 +231,7 @@ Summary 展示后，必须询问：
 0. 强制 memory/ 存在性检查：
    IF memory/ 不存在:
      警告：「总复盘必须先完成 Gene 化，但 memory/ 目录不存在。」
-     自动运行 python3 scripts/init_memory.py --project-dir .
+     自动运行 python3 scripts/manage_assets.py init --project-dir .
      然后继续执行下方流程
 1. 写入 .retro/reviews/YYYY-MM-DD-final.md（完整分析）
 2. 更新 state.json

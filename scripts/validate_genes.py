@@ -242,6 +242,20 @@ def validate(assets: list[dict], facets: list[dict]) -> dict:
         }
         if needs_semantic_review:
             result_entry["needs_semantic_review"] = True
+
+        # Add suggested_fix for negative judgments
+        if judgment == "ineffective":
+            result_entry["suggested_fix"] = (
+                f"Gene '{atitle}' was complied with but didn't achieve expected outcome. "
+                f"Suggestion: check if trigger is too broad (matched {len(matched_facets)} facets), "
+                f"or if method steps need refinement."
+            )
+        elif judgment == "over_scoped":
+            result_entry["suggested_fix"] = (
+                f"Gene '{atitle}' was not complied with but session still succeeded. "
+                f"Suggestion: narrow trigger conditions, add skip_when to exempt this scenario."
+            )
+
         results.append(result_entry)
 
         # Collect validated_highlights
@@ -273,6 +287,12 @@ def validate(assets: list[dict], facets: list[dict]) -> dict:
             summary["ineffective"] += 1
         elif judgment == "over_scoped":
             summary["over_scoped"] += 1
+
+    # Count needs_attention
+    summary["needs_attention"] = sum(
+        1 for r in results
+        if r.get("suggested_fix") or r.get("alert")
+    )
 
     return {
         "validated_at": date.today().isoformat(),
@@ -317,6 +337,46 @@ def main():
         print("Warning: no facets found", file=sys.stderr)
 
     report = validate(assets, facets)
+
+    # Post-process: check consecutive failures from evolution.jsonl
+    evolution_path = Path(args.memory_dir) / "evolution.jsonl"
+    if evolution_path.exists():
+        try:
+            events = []
+            with open(evolution_path, "r", encoding="utf-8") as f:
+                for line in f:
+                    line = line.strip()
+                    if line:
+                        events.append(json.loads(line))
+
+            for r in report["results"]:
+                aid = r["asset_id"]
+                # Count consecutive validate failures (working backwards)
+                consecutive = 0
+                for ev in reversed(events):
+                    if ev.get("asset_id") == aid and ev.get("event") == "validate":
+                        details = ev.get("details", {})
+                        if details.get("judgment") in ("ineffective", "over_scoped"):
+                            consecutive += 1
+                        else:
+                            break
+                    elif ev.get("asset_id") == aid:
+                        break
+
+                if consecutive >= 3:
+                    r["alert"] = (
+                        f"WARNING: Gene '{r.get('asset_title', aid)}' has {consecutive} "
+                        f"consecutive validation failures. Consider deprecating or rewriting trigger/method."
+                    )
+        except (json.JSONDecodeError, OSError):
+            pass
+
+    # Recount needs_attention after post-processing
+    report["summary"]["needs_attention"] = sum(
+        1 for r in report["results"]
+        if r.get("suggested_fix") or r.get("alert")
+    )
+
     json.dump(report, sys.stdout, ensure_ascii=False, indent=2)
     print()
 

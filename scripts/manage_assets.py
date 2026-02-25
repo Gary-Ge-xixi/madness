@@ -10,6 +10,7 @@ import sys
 from lib import (
     VALID_ASSET_TYPES,
     VALID_STATUSES,
+    append_evolution,
     read_json_list,
     type_to_filename,
     utc_now_iso,
@@ -18,13 +19,6 @@ from lib import (
 )
 
 VALID_TYPES = tuple(sorted(VALID_ASSET_TYPES))
-
-
-def append_evolution(memory_dir, entry):
-    filepath = os.path.join(memory_dir, "evolution.jsonl")
-    os.makedirs(memory_dir, exist_ok=True)
-    with open(filepath, "a", encoding="utf-8") as f:
-        f.write(json.dumps(entry, ensure_ascii=False) + "\n")
 
 
 def title_to_id(title):
@@ -194,6 +188,44 @@ def cmd_list(args):
     print(json.dumps(summary, ensure_ascii=False, indent=2))
 
 
+def cmd_init(args):
+    """Initialize memory/ directory structure."""
+    memory_dir = os.path.join(os.path.abspath(args.project_dir), "memory")
+
+    if os.path.exists(memory_dir):
+        print("memory/ already exists, skipping init", file=sys.stderr)
+        sys.exit(0)
+
+    try:
+        os.makedirs(memory_dir, exist_ok=True)
+        os.makedirs(os.path.join(memory_dir, "views"), exist_ok=True)
+        os.makedirs(os.path.join(memory_dir, "exports"), exist_ok=True)
+
+        files = {
+            "index.json": json.dumps(
+                {"schema_version": "1.0", "assets": {"genes": 0, "sops": 0, "prefs": 0}, "last_updated": ""},
+                ensure_ascii=False, indent=2,
+            ),
+            "INDEX.md": "# Memory \u8d44\u4ea7\u7d22\u5f15\n\n> \u81ea\u52a8\u751f\u6210\uff0c\u8bf7\u52ff\u624b\u52a8\u7f16\u8f91\n\n\u6682\u65e0\u8d44\u4ea7\u3002\n",
+            "genes.json": "[]",
+            "sops.json": "[]",
+            "prefs.json": "[]",
+            "evolution.jsonl": "",
+        }
+
+        for filename, content in files.items():
+            filepath = os.path.join(memory_dir, filename)
+            with open(filepath, "w", encoding="utf-8") as f:
+                f.write(content)
+
+        result = {"initialized": True, "path": memory_dir}
+        print(json.dumps(result, ensure_ascii=False, indent=2))
+
+    except OSError as e:
+        print(f"Error initializing memory directory: {e}", file=sys.stderr)
+        sys.exit(1)
+
+
 def cmd_export_portable(args):
     min_conf = args.min_confidence
     result_assets = {"genes": [], "sops": [], "prefs": []}
@@ -255,10 +287,18 @@ def main():
     p_export = sub.add_parser("export-portable", help="Export portable assets")
     p_export.add_argument("--min-confidence", type=float, default=0.70, help="Minimum confidence (default: 0.70)")
 
+    p_init = sub.add_parser("init", help="Initialize memory/ directory structure")
+    p_init.add_argument("--project-dir", default=".", help="Project root directory (default: .)")
+
     args = parser.parse_args()
 
+    # init command doesn't require existing memory_dir
+    if args.command == "init":
+        cmd_init(args)
+        return
+
     if not os.path.isdir(args.memory_dir):
-        print(f"Error: memory directory '{args.memory_dir}' does not exist. Run init_memory.py first.", file=sys.stderr)
+        print(f"Error: memory directory '{args.memory_dir}' does not exist. Run manage_assets.py init first.", file=sys.stderr)
         sys.exit(1)
 
     dispatch = {

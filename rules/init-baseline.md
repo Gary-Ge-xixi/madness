@@ -34,14 +34,12 @@ python3 scripts/aggregate_facets.py --retro-dir .retro
 
 **3. 产出盘点**
 
-运行产出物扫描脚本：
-```bash
-python3 scripts/scan_artifacts.py \
-  --project-dir . --last-review-at 1970-01-01
-```
-→ 输出新增文件列表、按类型分类（报告/数据/可视化/工具/文档）、总大小
+使用 Glob 扫描项目目录，盘点全部产出物：
+- 扫描项目根目录（排除 .git、.retro、node_modules、__pycache__、.venv）
+- 按类型分类（报告 .md/.txt、数据 .json/.csv、工具 .py/.ts、可视化 .png/.svg/.html、文档 .doc/.pptx）
+- 统计文件数量和总大小
 
-注意：init 模式使用 1970-01-01 作为基准日期，扫描全部文件。
+注意：init 模式扫描全部文件（无日期过滤）。
 
 ### 阶段 B: 深度归因分析（子智能体并行）
 
