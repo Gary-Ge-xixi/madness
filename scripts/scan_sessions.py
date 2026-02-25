@@ -29,16 +29,30 @@ def find_project_dir(project_dir: str) -> Path | None:
         print(f"Error: Claude projects directory not found: {claude_projects}", file=sys.stderr)
         return None
 
-    # Convert project dir path to Claude's naming convention: slashes become hyphens
+    # Convert project dir path to Claude's naming convention:
+    # slashes become hyphens, underscores also become hyphens
     abs_project = os.path.abspath(project_dir)
     encoded_name = abs_project.replace("/", "-")
 
-    candidate = claude_projects / encoded_name
-    if candidate.is_dir():
-        return candidate
+    # Build candidate list: exact match + underscore-to-hyphen variant
+    candidates = [claude_projects / encoded_name]
+    encoded_name_alt = encoded_name.replace("_", "-")
+    if encoded_name_alt != encoded_name:
+        candidates.append(claude_projects / encoded_name_alt)
+
+    # Prefer candidate with actual .jsonl files
+    for candidate in candidates:
+        if candidate.is_dir() and list(candidate.glob("*.jsonl")):
+            return candidate
+
+    # Fallback: return first existing directory even if empty
+    for candidate in candidates:
+        if candidate.is_dir():
+            return candidate
 
     print(f"Error: no matching project directory found for '{abs_project}'", file=sys.stderr)
-    print(f"  Expected: {candidate}", file=sys.stderr)
+    for c in candidates:
+        print(f"  Tried: {c}", file=sys.stderr)
     return None
 
 
@@ -64,7 +78,11 @@ def is_subagent_session(file_path: Path) -> bool:
 
 
 def count_human_messages(file_path: Path) -> int:
-    """Count messages with type 'human' in a JSONL file."""
+    """Count user messages in a JSONL file.
+
+    Claude Code uses type='user' (not 'human') for user messages.
+    We check both for backwards compatibility.
+    """
     count = 0
     try:
         with open(file_path, "r", encoding="utf-8") as f:
@@ -74,7 +92,7 @@ def count_human_messages(file_path: Path) -> int:
                     continue
                 try:
                     obj = json.loads(line)
-                    if obj.get("type") == "human":
+                    if obj.get("type") in ("human", "user"):
                         count += 1
                 except json.JSONDecodeError:
                     continue
