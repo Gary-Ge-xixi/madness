@@ -137,9 +137,9 @@ madness/
 │   ├── validation-protocol.md  # Gene 验证与偏离检测协议（四级匹配）
 │   └── bad-cases.md            # 质量反面教材（6 条自检规则）
 ├── scripts/
-│   ├── validate_facet.py       # Facet 验证与缓存（5 类 ai_collab + extraction_confidence）
+│   ├── validate_facet.py       # Facet 验证与缓存（5 类 ai_collab + extraction_confidence、支持 raw JSON 输入）
 │   ├── validate_genes.py       # Gene 验证协议（四级匹配 + 探索豁免 + 正向反馈）
-│   ├── aggregate_facets.py     # Facet 聚合统计（含 --output-file 持久化）
+│   ├── aggregate_facets.py     # Facet 聚合统计（含 --output-file 持久化、--facets-dir 兼容）
 │   ├── check_report.py         # 报告质量红线自检（7 条规则，满分 100）
 │   ├── manage_assets.py        # Gene/SOP/Pref 资产 CRUD + memory/ 初始化
 │   ├── inject_claudemd.py      # CLAUDE.md 规则注入
@@ -178,6 +178,11 @@ memory/                         # 认知资产（可跨项目继承）
 6. **摘要/详情分离** — 先展示 ≤500 字摘要，用户要求时展开详情
 
 ## 更新记录
+
+### v2.1.1 (2026-02-26) — 脚本输入健壮性修复
+
+- **aggregate_facets.py**：新增 `--facets-dir` 兼容参数，自动推导 `--retro-dir`，修复 AI 传错参数时的 `unrecognized arguments` 错误
+- **validate_facet.py**：`read_input()` 支持直接解析 raw JSON 字符串，修复 AI 将 JSON 当 `--input` 值传入导致的 `Errno 63: File name too long`
 
 ### v2.1.0 (2026-02-24) — 问题诊断与覆盖面分析
 
