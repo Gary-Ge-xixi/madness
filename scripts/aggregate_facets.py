@@ -147,10 +147,21 @@ def aggregate(facets):
 
 def main():
     parser = argparse.ArgumentParser(description="Aggregate statistics from cached facets")
-    parser.add_argument("--retro-dir", default=".retro", help="Retro directory (default: .retro)")
+    parser.add_argument("--retro-dir", default=None, help="Retro directory (default: .retro)")
+    parser.add_argument("--facets-dir", default=None, help="(Deprecated) Facets directory — auto-derives retro-dir as parent")
     parser.add_argument("--since", default=None, help="Only include facets with date >= DATE (YYYY-MM-DD)")
     parser.add_argument("--output-file", default=None, help="Write output to file instead of stdout (for large project batch processing)")
     args = parser.parse_args()
+
+    # Resolve retro_dir: --facets-dir takes precedence if --retro-dir not set
+    if args.retro_dir is None and args.facets_dir is not None:
+        # --facets-dir points to .retro/facets, so parent is the retro dir
+        args.retro_dir = os.path.dirname(args.facets_dir.rstrip("/"))
+        if not args.retro_dir:
+            args.retro_dir = ".retro"
+        print(f"Note: --facets-dir is deprecated, use --retro-dir instead", file=sys.stderr)
+    elif args.retro_dir is None:
+        args.retro_dir = ".retro"
 
     facets = load_facets(args.retro_dir, since=args.since)
     result = aggregate(facets)

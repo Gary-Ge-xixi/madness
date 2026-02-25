@@ -152,9 +152,13 @@ def validate_facet(data):
 
 
 def read_input(input_arg):
-    """Read JSON from file path or stdin."""
+    """Read JSON from file path, raw JSON string, or stdin."""
     if input_arg is None or input_arg == "-":
         return json.load(sys.stdin)
+    # If it looks like a JSON object/array, parse directly
+    stripped = input_arg.strip()
+    if stripped.startswith("{") or stripped.startswith("["):
+        return json.loads(stripped)
     with open(input_arg, "r") as f:
         return json.load(f)
 
