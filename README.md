@@ -140,14 +140,10 @@ madness/
 │   ├── validate_facet.py       # Facet 验证与缓存（5 类 ai_collab + extraction_confidence）
 │   ├── validate_genes.py       # Gene 验证协议（四级匹配 + 探索豁免 + 正向反馈）
 │   ├── aggregate_facets.py     # Facet 聚合统计（含 --output-file 持久化）
-│   ├── check_report.py         # 报告质量红线自检（6 条规则，满分 100）
-│   ├── log_evolution.py        # 资产演化事件日志
-│   ├── manage_assets.py        # Gene/SOP/Pref 资产 CRUD
+│   ├── check_report.py         # 报告质量红线自检（7 条规则，满分 100）
+│   ├── manage_assets.py        # Gene/SOP/Pref 资产 CRUD + memory/ 初始化
 │   ├── inject_claudemd.py      # CLAUDE.md 规则注入
-│   ├── manage_state.py         # state.json 状态管理
-│   ├── scan_sessions.py        # 会话扫描
-│   ├── scan_artifacts.py       # 产出物扫描
-│   └── init_memory.py          # memory/ 目录初始化
+│   └── scan_sessions.py        # 会话扫描
 └── docs/plans/                 # 设计文档与实现计划
 ```
 

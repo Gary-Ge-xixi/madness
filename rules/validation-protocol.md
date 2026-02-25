@@ -95,13 +95,13 @@ FOR each asset IN all_active_assets:
     → 脚本自动：version+1、状态转换（≥0.85→active, 0.50~0.84→provisional, <0.50→deprecated）
 
   记录验证事件：
-    python3 scripts/log_evolution.py \
+    python3 scripts/lib.py evolution \
       --event validate \
       --asset-id ASSET_ID \
       --details '{"result":"validated","evidence":"session原文摘录","confidence_delta":0.05,"new_confidence":0.75}'
 
   如果 deprecated：
-    python3 scripts/log_evolution.py \
+    python3 scripts/lib.py evolution \
       --event deprecate \
       --asset-id ASSET_ID \
       --details '{"reason":"confidence dropped below 0.50","last_confidence":0.48}'

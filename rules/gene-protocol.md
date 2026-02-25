@@ -255,7 +255,7 @@ FOR each domain:
 如果 memory/ 不存在（首次 Gene 化时），运行初始化脚本：
 
 ```bash
-python3 scripts/init_memory.py --project-dir .
+python3 scripts/manage_assets.py init --project-dir .
 ```
 
 → 自动创建完整目录结构：

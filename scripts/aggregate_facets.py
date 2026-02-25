@@ -44,6 +44,7 @@ def aggregate(facets):
             "by_outcome": {},
             "by_date": {},
             "friction_top5": [],
+            "success_patterns": {},
             "loop_rate": 0.0,
             "loop_sessions": [],
             "ai_collab_summary": {
@@ -114,12 +115,20 @@ def aggregate(facets):
         for ftype, count in friction_counter.most_common(5)
     ]
 
+    # Extract success patterns from fully_achieved facets
+    success_patterns = {}
+    for facet in facets:
+        if facet.get("outcome") == "fully_achieved":
+            cat = facet.get("goal_category", "unknown")
+            success_patterns[cat] = success_patterns.get(cat, 0) + 1
+
     return {
         "total_sessions": total,
         "by_goal_category": dict(by_goal_category),
         "by_outcome": dict(by_outcome),
         "by_date": dict(by_date),
         "friction_top5": friction_top5,
+        "success_patterns": success_patterns,
         "loop_rate": round(len(loop_sessions) / total, 2) if total else 0.0,
         "loop_sessions": loop_sessions,
         "ai_collab_summary": {

@@ -194,7 +194,7 @@ def main():
     if not os.path.isdir(args.project_memory_dir):
         print(json.dumps({
             "error": f"project memory directory not found: {args.project_memory_dir}",
-            "hint": "Run init_memory.py first to create memory/ directory"
+            "hint": "Run manage_assets.py init first to create memory/ directory"
         }))
         sys.exit(1)
 
