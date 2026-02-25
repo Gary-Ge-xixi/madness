@@ -2,29 +2,27 @@
 
 > 在展示报告后、确认存盘前执行。目标不是总结问题，是逼用户面对思维盲区。
 
+## 前置步骤 0：AI 执行质量自审（不可跳过）
+
+> 加载 [_shared/ai-audit.md](_shared/ai-audit.md) 执行。
+
+在质询用户行为之前，必须先按 ai-audit.md 的归因优先级审查 AI 自身的执行质量。
+
+```
+IF ai_execution 问题 ≥ 1:
+  Socratic 第 1 轮必须先质询 AI 执行问题
+  质询措辞示例：
+  - 「在 [日期] 的会话中，你给了 AI [参数/参考]，但 AI 实现时 [偏差描述]。这不是你的问题，是 AI 执行偏差。我们需要一条规则来防止下次再犯。」
+  - 「CLAUDE.md 第 N 行写了 [规则]，但 AI 在 [session] 中没有遵循。这是 AI 的规范遵循缺陷，不是你的指令不够清晰。」
+```
+
+构建完 AI 执行问题清单后，再进入下方的用户行为证据构建。
+
+---
+
 ## 前置：证据构建（内部执行，不展示）
 
-从 facet 的 `ai_collab` 字段 + 原始 session 中寻找五类嫌疑：
-
-**阿谀陷阱 (Sycophancy Trap)**
-用户问了引导性问题（"这样是不是更好？""用户应该会喜欢吧？"），AI 顺着说了。
-→ 标志：ai_collab.sycophancy 有值
-
-**逻辑跳跃 (Logic Leap)**
-从用研直接跳到设计、从需求直接跳到代码，中间缺推导步骤。
-→ 标志：ai_collab.logic_leap 有值，或相邻 session 的 goal_category 跨度大
-
-**思维偷懒 (Lazy Prompting)**
-直接问"怎么解决"而不是"为什么出错"。
-→ 标志：ai_collab.lazy_prompting 有值
-
-**自动化投降 (Automation Surrender)**
-AI 给出代码/方案后直接使用，未验证正确性、未检查边界条件、未理解底层逻辑。
-→ 标志：ai_collab.automation_surrender 有值
-
-**锚定效应 (Anchoring Effect)**
-被 AI 给出的第一个方案锚定思维，未探索替代方案、未质疑是否最优。
-→ 标志：ai_collab.anchoring_effect 有值
+> 按 [_shared/ai-audit.md](_shared/ai-audit.md) 的五类用户行为检测定义，从 facet 的 `ai_collab` 字段 + 原始 session 中寻找嫌疑。
 
 如果 facet 中证据不足，回到原始 session 数据补充。
 构建至少 3 条"起诉书"后进入质询。

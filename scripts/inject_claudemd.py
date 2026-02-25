@@ -7,8 +7,9 @@ import os
 import re
 import shutil
 import sys
-from datetime import date
 from pathlib import Path
+
+from lib import INJECTABLE_STATUSES, load_all_assets, today_iso
 
 
 MARKER_START = "<!-- madness:memory-inject start -->"
@@ -16,31 +17,11 @@ MARKER_END = "<!-- madness:memory-inject end -->"
 RULE_PATTERN = re.compile(r"^#\s*R\d+\s*\[(\w+):(.+?),\s*c:([\d.]+),\s*v:(\d+)\]")
 
 
-def load_assets(memory_dir: Path) -> list[dict]:
-    """Load and merge assets from genes.json, sops.json, prefs.json."""
-    assets = []
-    for filename, asset_type in [("genes.json", "gene"), ("sops.json", "sop"), ("prefs.json", "pref")]:
-        filepath = memory_dir / filename
-        if not filepath.exists():
-            continue
-        try:
-            with open(filepath, "r", encoding="utf-8") as f:
-                data = json.load(f)
-            items = data if isinstance(data, list) else data.get("items", data.get("assets", []))
-            for item in items:
-                item.setdefault("asset_type", asset_type)
-                assets.append(item)
-        except (json.JSONDecodeError, OSError) as e:
-            print(f"Warning: failed to read {filepath}: {e}", file=sys.stderr)
-    return assets
-
-
 def filter_assets(assets: list[dict]) -> list[dict]:
     """Filter by status and confidence, sort by confidence descending."""
-    valid_statuses = {"active", "provisional"}
     filtered = [
         a for a in assets
-        if a.get("status") in valid_statuses and float(a.get("confidence", 0)) >= 0.50
+        if a.get("status") in INJECTABLE_STATUSES and float(a.get("confidence", 0)) >= 0.50
     ]
     filtered.sort(key=lambda a: float(a.get("confidence", 0)), reverse=True)
     return filtered
@@ -141,7 +122,7 @@ def merge_rules(existing: dict, new_assets: list[dict], max_rules: int) -> tuple
 
 def build_section(merged: list[dict]) -> str:
     """Build the full inject section content."""
-    today = date.today().isoformat()
+    today = today_iso()
     max_ver = max((a["_version"] for a in merged), default=1)
     lines = [MARKER_START, f"## \u590d\u76d8\u6c89\u6dc0\u89c4\u5219\u96c6\uff08v{max_ver}, {today}\uff09", ""]
     for i, asset in enumerate(merged, 1):
@@ -183,7 +164,7 @@ def main():
         sys.exit(1)
 
     # Step 1-3: Load, filter, sort assets
-    assets = load_assets(memory_dir)
+    assets = load_all_assets(str(memory_dir))
     filtered = filter_assets(assets)
     top_assets = filtered[:args.max_rules * 2]  # load extra for merge headroom
 

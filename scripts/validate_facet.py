@@ -102,6 +102,28 @@ def validate_facet(data):
             elif not isinstance(data["ai_collab"][key], str):
                 errors.append(f"ai_collab.{key} must be a string")
 
+    # ai_execution (optional, backward compatible: warn if missing)
+    AI_EXEC_FIELDS = ("param_fidelity", "spec_compliance", "first_round_accuracy", "rework_attribution")
+    FIRST_ROUND_VALUES = {"correct", "partial", "wrong"}
+    REWORK_ATTR_VALUES = {"user_change", "ai_deviation", "both", ""}
+    if "ai_execution" not in data:
+        warnings.append("Missing optional field: ai_execution (recommended for v3 AI execution audit)")
+    elif not isinstance(data["ai_execution"], dict):
+        errors.append("Field 'ai_execution' must be a dict")
+    else:
+        for key in AI_EXEC_FIELDS:
+            if key not in data["ai_execution"]:
+                warnings.append(f"ai_execution missing key: {key}")
+            elif not isinstance(data["ai_execution"][key], str):
+                errors.append(f"ai_execution.{key} must be a string")
+        # Validate enum values for specific fields
+        fra = data["ai_execution"].get("first_round_accuracy", "")
+        if fra and fra not in FIRST_ROUND_VALUES:
+            errors.append(f"ai_execution.first_round_accuracy must be one of {sorted(FIRST_ROUND_VALUES)}, got '{fra}'")
+        ra = data["ai_execution"].get("rework_attribution", "")
+        if ra and ra not in REWORK_ATTR_VALUES:
+            errors.append(f"ai_execution.rework_attribution must be one of {sorted(REWORK_ATTR_VALUES - {''})}, got '{ra}'")
+
     # extraction_confidence (optional, warn if missing)
     if "extraction_confidence" in data:
         ec = data["extraction_confidence"]

@@ -37,6 +37,17 @@ description: >
   - 文件存在 + 无 "final" → 模式 = mid（中期复盘）
 ```
 
+### Step 0.5: 跨项目知识回溯检查（所有模式）
+
+```
+IF .retro/ 存在 AND memory/ 不存在 AND .retro/reviews/ 下有历史复盘报告:
+  警告用户：「检测到历史复盘数据但无 memory/ 目录。
+  这意味着之前的 Gene 化流程可能未执行。
+  是否从历史复盘报告中回溯提取 Gene？」
+  用户确认 → 初始化 memory/，然后从 .retro/reviews/ 提取 Gene 候选
+  用户跳过 → 继续，记录告警到报告中
+```
+
 ### Step 1: 初始化（仅 init 模式）
 
 如果 .retro/ 不存在，执行初始化：
@@ -54,10 +65,36 @@ description: >
      --project-dir "当前项目根目录"
    ```
 
-4. 检查项目 CLAUDE.md 是否已有复盘提醒行，没有则追加：
+3. 检查项目 CLAUDE.md 是否已有复盘提醒行，没有则追加：
    ```
    <!-- madness retro reminder -->
    如果 .retro/state.json 存在且距 last_review_at 超过 review_interval_days，在会话开头提醒："距上次复盘已过 N 天，建议 /madness"
+   ```
+
+4. **shared-memory 扫描 + 下拉（仅当父目录有 shared-memory/ 时）**：
+   ```
+   IF 父目录有 shared-memory/:
+     Step A: 扫描
+       读取 shared-memory/META.json
+       扫描兄弟项目的 memory/exports/portable.json（如有）
+       输出：shared-memory 规则总数 + 兄弟项目已沉淀的 Gene 总数
+
+     Step B: 比对去重（先比对，再下拉）
+       运行 sync_shared_memory.py --direction down:
+         python3 scripts/sync_shared_memory.py \
+           --shared-memory-dir ../shared-memory \
+           --project-memory-dir ./memory \
+           --direction down
+       → 输出 pull_candidates 列表（仅 shared-memory 中有但本项目无的规则）
+       → 自动排除本项目 memory/ 中已有相同 id 的规则
+       → 如果 Step 0.5 已回溯生成了 Gene，这里会自动跳过重复项
+
+     Step C: 用户确认后下拉
+       展示去重后的导入候选列表
+       用户确认 → 批量创建到本项目 memory/，标记 imported_from_shared: true
+       每条下拉的 Gene confidence 沿用 shared-memory 的值，status 设为 provisional
+   ELSE:
+     跳过此步骤
    ```
 
 5. 扫描已有 session 建立基线：
@@ -73,11 +110,15 @@ description: >
 
 6. 基线分析 → 加载 [rules/init-baseline.md](rules/init-baseline.md) 执行两阶段分析
 
-7. **展示报告**（不要直接写入文件）
-   - 先展示给用户看
+7. **质量门控 + 展示报告**
+   - 运行 `python3 scripts/check_report.py --file /tmp/madness_report_draft.md`
+   - score ≥ 80 → 展示给用户看
+   - score < 80 → 回到阶段 B 补充，重新检测（最多 2 次），仍不达标则标注「质量告警」后展示
+   - 将质检分数附在报告末尾（用户可见）
+   - **不要直接写入文件**
 
 8. **苏格拉底质询** → 加载 [rules/socratic.md](rules/socratic.md) 执行
-   - 基于基线报告 + facet 中的 ai_collab 证据，向用户发起 3 轮攻击性提问
+   - 先执行 AI 执行质量自审（前置步骤 0），再基于基线报告 + facet 中的 ai_collab 证据，向用户发起 3 轮攻击性提问
    - 第 4 轮：触发条件提炼，将行为纠偏中的强制约束转化为 Gene 候选
    - 质询完成后追加「思维尸检」+「行为纠偏」+「Gene 候选表」到报告
 
@@ -88,22 +129,22 @@ description: >
      2. 写入 `.retro/reviews/YYYY-MM-DD-init.md`
    - **严禁跳过确认直接存盘**
 
+**历史复盘数据回溯检查**：
+```
+IF .retro/ 存在但 memory/ 不存在:
+  警告用户：「检测到历史复盘数据（.retro/）但无 memory/ 目录。
+  这意味着之前的 Gene 化流程可能未执行。
+  是否从历史复盘报告中回溯提取 Gene？」
+  用户确认 → 读取 .retro/reviews/ 中的复盘报告，提取 Gene 候选 → 执行 Step 6
+  用户跳过 → 继续，但记录告警
+```
+
 初始化完成后，本次不再执行中期复盘。提示用户下次直接 `/madness`。
 
 ### 子智能体通用规则
 
-> 适用于所有模式中的 facet 提取（init Step 1.5 / mid-final Step 3）和聚合分析。
-
-- 每个子智能体批量处理 ≥3 个 session，不要 1 对 1
-- 语义理解任务用 sonnet，不用 haiku
-- **JSON 输出约束**：Prompt 中必须包含以下指令：
-  ```
-  输出要求：
-  1. 必须是有效的 JSON 数组
-  2. 字符串值中不要使用未转义的 ASCII 双引号，中文引号用「」替代
-  3. 不要在 JSON 中包含注释
-  4. 输出前自行验证 JSON 格式有效性
-  ```
+> 详见 [rules/_shared/subagent-protocol.md](rules/_shared/subagent-protocol.md)。
+> 核心：批量 ≥3 session/智能体、语义任务用 sonnet、JSON 输出必须含 4 条格式约束指令。
 
 ### Step 2: 项目扫描 + 数据采集（仅 mid / final 模式）
 
@@ -143,47 +184,7 @@ description: >
 
 > 子智能体使用规则见上方「子智能体通用规则」段落。
 
-**Facet 字段**：
-
-```json
-{
-  "session_id": "",
-  "date": "YYYY-MM-DD",
-  "duration_min": 0,
-  "goal": "本次会话的主要目标（一句话）",
-  "goal_category": "implement | refine_methodology | debug_fix | explore_learn | review_calibrate | plan_design | visualize_report",
-  "outcome": "fully_achieved | partially_achieved | not_achieved",
-  "friction": ["摩擦类型枚举值"],
-  "loop_detected": false,
-  "loop_detail": "如果检测到循环，描述循环内容",
-  "key_decision": "本次会话中做出的关键决策（如有）",
-  "learning": "本次会话中获得的关键认知（如有）",
-  "tools_used": ["工具名称"],
-  "files_changed": 0,
-  "domain_knowledge_gained": "获得的领域知识（如有）",
-  "ai_collab": {
-    "sycophancy": "引导性问题+AI顺从的场景（如有）",
-    "logic_leap": "跳过推导直接跳结论的场景（如有）",
-    "lazy_prompting": "直接要答案没问为什么的场景（如有）",
-    "automation_surrender": "不验证AI输出直接使用的场景（如有）",
-    "anchoring_effect": "被AI第一个方案锚定思维、未探索替代方案的场景（如有）"
-  },
-  "extraction_confidence": 0.85
-}
-```
-
-**friction 枚举值**：
-- `prompt_too_long` — Prompt 过长导致注意力稀释
-- `classification_ambiguity` — 分类/判断标准不清晰
-- `serial_bottleneck` — 串行执行导致效率低
-- `data_architecture_mismatch` — 数据格式不适合后续处理
-- `scope_creep` — 范围蔓延
-- `tool_misuse` — 工具使用不当
-- `context_limit` — 上下文窗口不足
-- `domain_knowledge_gap` — 领域知识不足
-- `rework_from_poor_planning` — 规划不足导致返工
-- `ai_dependency` — 过度依赖 AI 导致认知偷懒
-- `other` — 其他（附说明）
+**Facet 字段定义** → 详见 [rules/_shared/facet-schema.md](rules/_shared/facet-schema.md)（含 13 必填字段、ai_collab 5 类、ai_execution 4 类、friction 11 枚举值）。
 
 ### Step 3b: Facet 质量抽检（仅 mid / final 模式，>5 个 facet 时）
 
@@ -205,48 +206,32 @@ ELSE:
 
 ### Step 4: 聚合分析（仅 mid / final 模式，两阶段）
 
-> **注意**：init 模式的两阶段分析已在 Step 1.6 中通过 init-baseline.md 执行，不走此步骤。
+> init 模式的两阶段分析在 Step 1→6 通过 init-baseline.md 执行，不走此步骤。
 
-mid 和 final 模式执行**两阶段分析**，不允许一次成型：
+两阶段分析：阶段 A 运行 `aggregate_facets.py` 做结构化提取 + 初步诊断，阶段 B 回到原始会话深度归因（带证据链）。不允许一次成型。
 
-> **术语澄清**：各模式的两阶段分析维度不同，具体见各 rules 文件。init 侧重「基线建立」（结构化提取 → 深度归因），mid 侧重「诊断 + 学习」，final 侧重「学习 + 诊断」。核心约束统一：必须先提取再归因，不允许一次成型。
+> validate_genes.py 匹配结果分 high/medium/low/none 四级。medium 需 Claude 语义确认后才进入合规检测。
 
-```
-阶段 A: 结构化提取
-  - 运行聚合统计脚本：
-    python3 scripts/aggregate_facets.py --retro-dir .retro [--since LAST_REVIEW_DATE]
-    → 输出 JSON：goal_category 分布、outcome 分布、friction Top5、loop_rate、ai_collab 统计
-  - 子智能体基于聚合数据做初步诊断和模式识别
-  - 产出：数据聚合 + 初步诊断
-
-阶段 B: 深度归因分析（子智能体并行）
-  - 基于阶段 A 的发现，回到原始会话数据追溯
-  - 对每个摩擦点/循环/改进点，提取具体用户原话作为证据
-  - 对每个"改进建议"，必须给出可执行的 SOP（步骤+检查点）
-  - 对 AI 协作模式，识别阿谀陷阱/逻辑跳跃/思维偷懒的具体场景
-  - 产出：带证据链的深度分析
-```
-
-> **注意**：validate_genes.py 的匹配结果分 high/medium/low/none 四级。medium 级别需要 Claude 语义确认后才进入合规检测。
-
-- **mid 模式** → 加载 [rules/mid-review.md](rules/mid-review.md) 执行
-- **final 模式** → 加载 [rules/final-review.md](rules/final-review.md) 执行
+- **mid 模式** → 加载 [rules/mid-review.md](rules/mid-review.md) 执行（侧重「诊断 + 学习」）
+- **final 模式** → 加载 [rules/final-review.md](rules/final-review.md) 执行（侧重「学习 + 诊断」）
 
 ### Step 5: 展示 + 苏格拉底质询 + 确认 + 沉淀（仅 mid / final 模式）
 
-> **注意**：init 模式的展示、质询和确认已在 Step 1.7-1.9 中执行，不走此步骤。
+> **注意**：init 模式的展示、质询和确认已在 Step 1→7~9 中执行，不走此步骤。
 
 ```
-1. 先展示报告摘要（≤500 字）→ 问用户「展开详情？」→ 用户要求时展示完整报告
+1. 质量门控：运行 check_report.py 确认 score ≥ 80（详见各 rules 文件的「质量门控」section）
+   score < 80 → 补充后重检（最多 2 次），仍不达标则标注「质量告警」
+2. 先展示报告摘要（≤500 字）→ 问用户「展开详情？」→ 用户要求时展示完整报告
    注意：苏格拉底质询无论用户是否看了详情，都必须执行。
-2. 苏格拉底质询 → 加载 rules/socratic.md 执行
+3. 苏格拉底质询 → 加载 rules/socratic.md 执行
    - 基于报告 + facet 中的 ai_collab + Gene 验证弹药，向用户发起 3 轮攻击性提问
    - 第 4 轮：触发条件提炼（含 Gene 验证中需修订的资产）
    - 质询完成后追加「思维尸检」+「行为纠偏」+「Gene 候选表」到报告
-3. 询问：「大锅，报告 + 质询结果都在这了，需要补充或调整吗？」
-4. 等待用户确认
+4. 询问：「大锅，报告 + 质询结果都在这了，需要补充或调整吗？」
+5. 等待用户确认
    - 严禁在用户确认前写入文件
-5. 确认后：
+6. 确认后：
    - 执行 Step 6（Gene 化 + CLAUDE.md 注入）
    - 写入 .retro/reviews/YYYY-MM-DD-{mid|final}.md
    - 更新 state.json：
@@ -306,52 +291,16 @@ mid 和 final 模式执行**两阶段分析**，不允许一次成型：
 }
 ```
 
-## 报告质量红线
+## 报告质量红线 & Bad Cases
 
-**每份报告必须满足以下标准，否则不允许展示给用户：**
-
-### 红线 1: 诊断必须有证据
-- 每个摩擦点/循环必须引用 ≥1 条用户原话作为证据
-- 不允许出现"规划不足导致返工"这种没有上下文的空话
-- 正确写法: "会话 X 中用户说'不如第一版本，重新构建'，返工 8 轮才收敛。根因是分类标准未在 Phase 0 定义"
-
-### 红线 2: 改进必须可执行
-- 每条改进建议必须包含：具体步骤 + 检查点 + 预期效果
-- 不允许出现"Prompt 做减法不够彻底"这种不说怎么做的建议
-- 正确写法: "Prompt 减法具体做法：①写步骤不写原则 ②分类标准放最前面 ③新版 Prompt 必须 A/B 测试后再推广 ④顶层≤50行"
-
-### 红线 3: 最佳实践必须含 SOP
-- 每条最佳实践必须包含：适用场景 + 具体做法 + 不适用场景
-- 不允许出现"子智能体 3份/智能体"这种不解释推导过程的结论
-- 正确写法: "批量提取同结构数据用 3份/智能体（18÷6=3，兼顾并行度和准确性）；精细校准用 1份/智能体；推导过程：1对1 资源浪费 → 6对1 任务过重 → 3对1 平衡点"
-
-### 红线 4: 必须带用户成长
-- 报告不只是"诊断问题"，必须"教用户如何避免"
-- 每个问题必须回答：下次遇到同样情况，第一步做什么？第二步做什么？
-- 对方法论演进，必须画出"从哪里来 → 经过什么转折 → 到哪里去"的轨迹
-
-## Bad Cases
-
-参见 [rules/bad-cases.md](rules/bad-cases.md)。执行时对照 bad case 自检，避免重蹈覆辙。
+> 详见 [rules/bad-cases.md](rules/bad-cases.md)。
+> 4 条红线：①诊断必须有证据（引用用户原话）②改进必须可执行（步骤+检查点）③最佳实践必须含 SOP ④必须带用户成长。
+> 执行时对照 bad case 自检，避免重蹈覆辙。
 
 ## 大项目策略（>30 session）
 
-当项目 session 数超过 30 个时，采用以下策略缓解上下文溢出：
-
-### 批次处理
-- 每批处理 10-15 个 session
-- 每批独立执行 Step 3（facet 提取）+ 即时缓存
-- 不要试图在一个上下文中处理全部 session
-
-### 摘要传递
-- 使用 `aggregate_facets.py --output-file .retro/aggregate_cache.json` 持久化聚合结果
-- 子智能体读聚合文件而非重新计算
-- 每批完成后增量更新聚合缓存
-
-### 中间持久化
-- 每批 facet 提取后立即缓存（validate_facet.py cache）
-- 聚合分析结果写入文件，避免丢失
-- Step 4 的深度归因可分批执行，最终合并
+> 详见 [rules/_shared/large-project-strategy.md](rules/_shared/large-project-strategy.md)。
+> 核心：批次处理（10-15 session/批）+ 摘要传递（聚合缓存持久化）+ 中间持久化（即时缓存 facet）。
 
 ## 语言
 
