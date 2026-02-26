@@ -12,7 +12,7 @@
 
 ```
 **先运行结构化验证脚本**（场景匹配 + 数值计算）：
-  python3 scripts/validate_genes.py \
+  python3 "$MADNESS_DIR"/scripts/validate_genes.py \
     --memory-dir ./memory \
     --retro-dir .retro \
     [--since LAST_REVIEW_DATE]
@@ -88,20 +88,20 @@ FOR each asset IN all_active_assets:
   根据 Step 3 的判定（结合脚本输出和 Claude 语义验证），更新资产：
 
   对每个验证结果，运行：
-    python3 scripts/manage_assets.py update \
+    python3 "$MADNESS_DIR"/scripts/manage_assets.py update \
       --id ASSET_ID \
       --confidence NEW_CONFIDENCE \
       [--status active|provisional|deprecated]
     → 脚本自动：version+1、状态转换（≥0.85→active, 0.50~0.84→provisional, <0.50→deprecated）
 
   记录验证事件：
-    python3 scripts/lib.py evolution \
+    python3 "$MADNESS_DIR"/scripts/lib.py evolution \
       --event validate \
       --asset-id ASSET_ID \
       --details '{"result":"validated","evidence":"session原文摘录","confidence_delta":0.05,"new_confidence":0.75}'
 
   如果 deprecated：
-    python3 scripts/lib.py evolution \
+    python3 "$MADNESS_DIR"/scripts/lib.py evolution \
       --event deprecate \
       --asset-id ASSET_ID \
       --details '{"reason":"confidence dropped below 0.50","last_confidence":0.48}'

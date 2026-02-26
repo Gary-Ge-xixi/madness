@@ -60,7 +60,7 @@ IF 候选描述的是「为什么选 A 不选 B」
 
 对每个候选，运行脚本创建资产（自动处理 ID 生成、去重、版本号、evolution 记录）：
 
-python3 scripts/manage_assets.py create \
+python3 "$MADNESS_DIR"/scripts/manage_assets.py create \
   --type gene|sop|pref \
   --data '{
     "title": "一句话标题",
@@ -190,7 +190,7 @@ Step 3: 重写规则集
   - 格式：# RN [type:id, c:置信度, v:版本]
 
 Step 4-5: 运行注入脚本（自动处理合并检测、规则重写、写入、审计）：
-  python3 scripts/inject_claudemd.py \
+  python3 "$MADNESS_DIR"/scripts/inject_claudemd.py \
     --claudemd ./CLAUDE.md \
     --memory-dir ./memory \
     --max-rules 10 \
@@ -255,7 +255,7 @@ FOR each domain:
 如果 memory/ 不存在（首次 Gene 化时），运行初始化脚本：
 
 ```bash
-python3 scripts/manage_assets.py init --project-dir .
+python3 "$MADNESS_DIR"/scripts/manage_assets.py init --project-dir .
 ```
 
 → 自动创建完整目录结构：
