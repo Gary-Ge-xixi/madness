@@ -36,6 +36,7 @@ VALID_EVENTS = [
     "inject_reflection",
     "promoted_to_active",
     "compliance_highlight",
+    "session_validate",
 ]
 
 # ---------------------------------------------------------------------------
@@ -219,6 +220,21 @@ def cmd_state_init(args):
             print(f"Error: invalid JSON in --goals: {e}", file=sys.stderr)
             sys.exit(1)
 
+    # Ensure goals have the enhanced structure (success_criteria + status)
+    for g in goals:
+        g.setdefault("success_criteria", "")
+        g.setdefault("status", "not_started")
+
+    # Build initial goal_history entries for any goals provided at init
+    goal_history = []
+    for idx, g in enumerate(goals):
+        goal_history.append({
+            "date": today_iso(),
+            "action": "add",
+            "goal_index": idx,
+            "reason": "项目初始化时设定",
+        })
+
     state = {
         "project_name": args.project_name,
         "project_dir": project_dir,
@@ -229,6 +245,8 @@ def cmd_state_init(args):
         "total_sessions": 0,
         "total_facets_cached": 0,
         "goals": goals,
+        "goal_history": goal_history,
+        "grai_scores": [],
         "reviews": [],
     }
 
@@ -254,17 +272,53 @@ def cmd_state_update(args):
             "date": today_iso(),
             "file": f"reviews/{today_iso()}-{review_type}.md",
         }
+        # 如果同时传入了 --grai-scores，关联最新的 GRAI 总分到 review
+        if args.grai_scores is not None:
+            try:
+                grai_data = json.loads(args.grai_scores)
+                if isinstance(grai_data, list):
+                    grai_data = grai_data[-1] if grai_data else {}
+                review_entry["grai_score"] = grai_data.get("total", 0)
+            except (json.JSONDecodeError, AttributeError):
+                pass
         state.setdefault("reviews", []).append(review_entry)
 
     if args.goals is not None:
         try:
-            state["goals"] = json.loads(args.goals)
+            new_goals = json.loads(args.goals)
+            # Ensure enhanced structure for each goal
+            for g in new_goals:
+                g.setdefault("success_criteria", "")
+                g.setdefault("status", "not_started")
+            state["goals"] = new_goals
         except json.JSONDecodeError as e:
             print(f"Error: invalid JSON in --goals: {e}", file=sys.stderr)
             sys.exit(1)
 
-    # Ensure goals field exists for backward compatibility
+    if args.goal_history is not None:
+        try:
+            new_entries = json.loads(args.goal_history)
+            if not isinstance(new_entries, list):
+                new_entries = [new_entries]
+            state.setdefault("goal_history", []).extend(new_entries)
+        except json.JSONDecodeError as e:
+            print(f"Error: invalid JSON in --goal-history: {e}", file=sys.stderr)
+            sys.exit(1)
+
+    if args.grai_scores is not None:
+        try:
+            new_score = json.loads(args.grai_scores)
+            if not isinstance(new_score, list):
+                new_score = [new_score]
+            state.setdefault("grai_scores", []).extend(new_score)
+        except json.JSONDecodeError as e:
+            print(f"Error: invalid JSON in --grai-scores: {e}", file=sys.stderr)
+            sys.exit(1)
+
+    # Ensure fields exist for backward compatibility
     state.setdefault("goals", [])
+    state.setdefault("goal_history", [])
+    state.setdefault("grai_scores", [])
 
     # Recount totals
     state["total_sessions"] = count_sessions(state.get("project_dir", project_dir))
@@ -278,8 +332,10 @@ def cmd_state_update(args):
 def cmd_state_read(args):
     project_dir = os.path.abspath(args.project_dir or ".")
     state = read_state(project_dir)
-    # Ensure goals field exists for backward compatibility
+    # Ensure fields exist for backward compatibility
     state.setdefault("goals", [])
+    state.setdefault("goal_history", [])
+    state.setdefault("grai_scores", [])
     json.dump(state, sys.stdout, indent=2)
     print()
 
@@ -346,6 +402,8 @@ def main():
     p_update.add_argument("--sessions-up-to", default=None, help="Set sessions_analyzed_up_to")
     p_update.add_argument("--add-review", default=None, metavar="TYPE", help="Append a review entry")
     p_update.add_argument("--goals", default=None, help="JSON array to replace goals")
+    p_update.add_argument("--goal-history", default=None, help="JSON array/object to append to goal_history")
+    p_update.add_argument("--grai-scores", default=None, help="JSON array/object to append to grai_scores")
     p_update.set_defaults(func=cmd_state_update)
 
     p_read = state_sub.add_parser("read", help="Read and output state.json")
