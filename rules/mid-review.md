@@ -92,20 +92,21 @@ python3 "$MADNESS_DIR"/scripts/validate_genes.py \
 - 在 Summary 的「做得好的」或「卡住的地方」中酌情引用产出数据
 ```
 
-**8. Goal-Gap 分析**
+**8. Goal-Gap 分析（GRAI-G 维度）**
 
 > 仅当 state.json 中 goals 非空时执行。
 
 ```
-读取 state.json 的 goals 列表
+读取 state.json 的 goals 列表（含 success_criteria 和 status）
+读取 goal_history 获取变更记录
 FOR each goal:
   - 从本轮 facet 中匹配相关 session（goal_category + goal 关键词匹配）
-  - 评估进展：未开始 / 进行中 / 已达成 / 偏离
+  - 评估进展：对照 success_criteria 判断达成程度
+  - 更新 status：not_started → in_progress → achieved / abandoned / changed
   - 如果偏离：引用 facet 证据说明何时何因偏离
-输出：Goal-Gap 表格
-
-| 目标 | 优先级 | 进展 | 关键 session | 偏离原因（如有）|
-|------|-------|------|-------------|----------------|
+  - 如果 success_criteria 为空：标注「无量化标准，按定性判断」
+输出：GRAI 目标回顾表格（填入报告模板的 grai:goal-review section）
+输出：GRAI 结果比对表格（填入报告模板的 grai:result-comparison section）
 ```
 
 ### 分析组 B：学习（按顺序逐项分析）
@@ -165,17 +166,40 @@ FOR each goal:
 ### Gene 验证报告
 （如果执行了阶段 A.0，在此展示验证结果表格、**遵守亮点**、偏离告警、新 Gene 候选。格式见 [validation-protocol.md](validation-protocol.md) 的「输出」section。如未执行阶段 A.0 则省略此 section。）
 
-### 目标进展（Goal-Gap）
-（仅当 state.json 中 goals 非空时展示）
+<!-- grai:goal-review start -->
+### 目标回顾
+| 目标 | 优先级 | 成功标准 | 当前状态 | 变更记录 |
+|------|--------|---------|---------|---------|
+（从 state.json goals 填入，status 字段映射为中文：not_started=未开始, in_progress=进行中, achieved=已达成, abandoned=已放弃, changed=已变更）
+（变更记录列从 goal_history 中筛选该目标相关条目，格式：MM-DD action reason）
+<!-- grai:goal-review end -->
 
-| 目标 | 优先级 | 进展 | 偏离原因 |
-|------|-------|------|---------|
+<!-- grai:result-comparison start -->
+### 结果比对
+| 目标 | 预期成果（success_criteria） | 实际结果 | 差距 | 亮点/不足 |
+|------|---------------------------|---------|------|----------|
+（基于 facet 聚合 + goals 交叉分析，对每个目标评估实际进展与 success_criteria 的差距）
+
+**亮点**：（至少 1 条，带 session 证据：哪个 session、什么行为、什么结果）
+**不足**：（至少 1 条，带用户原话引用）
+<!-- grai:result-comparison end -->
+
+<!-- grai:analysis start -->
+### 原因分析
+#### 主观原因（用户决策/认知层面）
+...（带证据链：具体 session + 用户原话 + 行为后果）
+#### 客观原因（AI/工具/环境层面）
+...（带证据链：具体 session + 工具表现 + 影响范围）
+<!-- grai:analysis end -->
+
+<!-- grai:insight start -->
+### 规律总结
+（从多个 session/场景归纳的通用规律，IF/THEN 结构）
+- IF [触发条件/场景] THEN [推荐做法] BECAUSE [证据/原因]
+（标注适用边界和不适用场景）
+<!-- grai:insight end -->
 
 ---
-
-### 做得好的
-- [1-2 条亮点]
-- 每条必须有证据（哪个 session、什么行为、什么结果）
 
 ### 卡住的地方
 对每条摩擦：

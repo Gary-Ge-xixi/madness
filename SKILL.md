@@ -74,8 +74,14 @@ IF .retro/ 存在 AND memory/ 不存在 AND .retro/reviews/ 下有历史复盘�
      → 自动映射复盘间隔：2天 / 4天 / 7天
    - Q3: 这个项目的核心目标是什么？（列出 1-3 个，每个用一句话描述）
      → 存入 state.json 的 goals 字段
-     → 格式：[{"goal": "描述", "priority": "high|medium"}]
+     → 格式：[{"goal": "描述", "priority": "high|medium", "success_criteria": "量化标准", "status": "not_started"}]
      → 用户不想定义 → goals 留空 []，后续复盘可补充
+   - Q3b: 对每个目标追问成功标准：
+     → 「这个目标怎么算达成？有量化指标吗？」
+     → 如果用户说不出量化指标，提供建议（如：完成 X 个模块、通过 Y 测试、覆盖率达到 Z%、交付 N 个功能等）
+     → 将回答填入 success_criteria 字段；用户跳过则留空字符串 ""
+     → 所有新目标的 status 初始化为 "not_started"
+     → 将初始目标记录到 goal_history（action: "add"）
 
 2. 创建目录结构 + state.json：
    ```bash
@@ -178,10 +184,25 @@ IF .retro/ 存在但 memory/ 不存在:
    IF goals 为空:
      提示用户：「大锅，state.json 中没有项目目标记录。补充 1-3 个目标？」
      用户补充 → 更新 state.json（python3 "$MADNESS_DIR"/scripts/lib.py state update --project-dir . --goals '[...]'）
+     → 对每个新目标追问 success_criteria：「这个目标怎么算达成？」
+     → 记录到 goal_history（action: "add"）
      用户跳过 → 继续，但在报告中标注「目标未定义，无法做 Goal-Gap 分析」
    ELSE:
-     展示当前目标列表，问「目标有变化吗？」
-     变化 → 更新；无变化 → 继续
+     展示当前目标列表（含 status 和 success_criteria）：
+     | # | 目标 | 优先级 | 成功标准 | 状态 |
+     |---|------|--------|---------|------|
+     （从 state.json goals 填入）
+
+     IF 有 success_criteria 为空的目标:
+       提示：「大锅，目标 #N 还没有量化的成功标准，要补充吗？」
+
+     问「目标有变化吗？」
+     变化 → 更新 goals + 自动记录到 goal_history：
+       - 修改目标 → action: "update"，记录 previous_value
+       - 放弃目标 → action: "abandon"，记录 reason + previous_value，status 改为 "abandoned"
+       - 新增目标 → action: "add"，追问 success_criteria
+       - 目标达成 → status 改为 "achieved"
+     无变化 → 继续
 1. 扫描新 session：
    python3 "$MADNESS_DIR"/scripts/scan_sessions.py \
      --state .retro/state.json --project-dir .
@@ -312,13 +333,45 @@ ELSE:
   "total_sessions": 0,
   "total_facets_cached": 0,
   "goals": [
-    {"goal": "一句话描述", "priority": "high|medium"}
+    {
+      "goal": "一句话描述",
+      "priority": "high|medium",
+      "success_criteria": "量化的成功标准（如：完成5个模块、测试覆盖率>80%）",
+      "status": "not_started|in_progress|achieved|abandoned|changed"
+    }
+  ],
+  "goal_history": [
+    {
+      "date": "YYYY-MM-DD",
+      "action": "add|update|abandon",
+      "goal_index": 0,
+      "reason": "变更原因",
+      "previous_value": "变更前的值（仅 update/abandon 时）"
+    }
+  ],
+  "grai_scores": [
+    {
+      "review_date": "YYYY-MM-DD",
+      "review_type": "init|mid|final",
+      "goal": 0,
+      "result": 0,
+      "analysis": 0,
+      "insight": 0,
+      "total": 0
+    }
   ],
   "reviews": [
     {
       "type": "init | mid | final",
       "date": "YYYY-MM-DD",
-      "file": "reviews/YYYY-MM-DD-type.md"
+      "file": "reviews/YYYY-MM-DD-type.md",
+      "grai_score": {
+        "goal": 0,
+        "result": 0,
+        "analysis": 0,
+        "insight": 0,
+        "total": 0
+      }
     }
   ]
 }
@@ -334,6 +387,85 @@ ELSE:
 
 > 详见 [rules/_shared/large-project-strategy.md](rules/_shared/large-project-strategy.md)。
 > 核心：批次处理（10-15 session/批）+ 摘要传递（聚合缓存持久化）+ 中间持久化（即时缓存 facet）。
+
+## Evolution 自进化闭环
+
+### 日常增量验证（Hook 驱动）
+
+每次会话结束时，Stop hook 自动运行轻量级验证脚本 `scripts/session_validate.py`：
+
+- 扫描本次会话是否触发了已有 Gene（纯文本关键词匹配，不调用 LLM）
+- 检测是否遵守了 Gene 的 method/steps
+- 增量更新 confidence（compliant +0.02, non_compliant -0.05）
+- 记录到 evolution.jsonl（event: "session_validate"）
+- confidence 降至 <0.50 时输出告警到 stderr
+
+设计原则：
+- **轻量**：纯文本匹配，执行时间 <2 秒
+- **静默**：正常情况只输出 JSON 到 stdout，不打扰用户
+- **安全**：任何异常都静默退出（exit 0），不影响用户会话
+- **增量**：confidence 变化幅度比复盘时小
+
+```bash
+# 仅检查（不更新 confidence）
+python3 "$MADNESS_DIR"/scripts/session_validate.py \
+  --project-dir . --mode check
+
+# 检查并更新（Hook 模式）
+python3 "$MADNESS_DIR"/scripts/session_validate.py \
+  --project-dir . --mode update
+
+# 指定 transcript 文件
+python3 "$MADNESS_DIR"/scripts/session_validate.py \
+  --project-dir . --session-file /path/to/session.jsonl --mode update
+```
+
+### CLAUDE.md 懒清理
+
+当资产 confidence 降到 deprecated（<0.50）时，CLAUDE.md 中的对应规则需要清理。
+
+- 下次复盘（/madness）时自动从 CLAUDE.md 移除
+- 或手动运行 `claudemd_cleanup.py` 立即清理
+
+```bash
+# 仅扫描，列出需要清理的规则
+python3 "$MADNESS_DIR"/scripts/claudemd_cleanup.py \
+  --claudemd ./CLAUDE.md --memory-dir ./memory
+
+# 扫描并自动清理
+python3 "$MADNESS_DIR"/scripts/claudemd_cleanup.py \
+  --claudemd ./CLAUDE.md --memory-dir ./memory --apply
+```
+
+### 置信度来源
+
+| 来源 | 触发时机 | confidence 变化 |
+|------|---------|----------------|
+| 复盘验证 | /madness | +0.05~0.10 / -0.15~0.30 |
+| 日常验证（Hook） | 每次会话结束 | +0.02 / -0.05 |
+| 跨项目验证 | shared-memory 同步 | +0.10 |
+
+### Hook 注册方式
+
+在项目根目录的 `.claude/settings.json` 中添加（或在 madness init 时自动提示）：
+
+```json
+{
+  "hooks": {
+    "Stop": [{
+      "matcher": "",
+      "hooks": [{
+        "type": "command",
+        "command": "python3 /path/to/madness/scripts/session_validate.py --project-dir . --mode update",
+        "timeout": 5
+      }]
+    }]
+  }
+}
+```
+
+> **注意**：将 `/path/to/madness/` 替换为技能的实际安装路径（即 MADNESS_DIR）。
+> 不要直接修改用户的全局 `~/.claude/settings.json`，Hook 应注册在项目级别。
 
 ## 语言
 

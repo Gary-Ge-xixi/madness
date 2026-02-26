@@ -78,21 +78,24 @@ python3 "$MADNESS_DIR"/scripts/validate_genes.py \
     Step 3: ...
 ```
 
-**5. 目标达成评估**
+**5. 目标达成评估（GRAI-G/R 维度）**
 
 > 仅当 state.json 中 goals 非空时执行。
 
 ```
-读取 state.json 的 goals 列表
+读取 state.json 的 goals 列表（含 success_criteria 和 status）
+读取 goal_history 获取完整变更时间线
 FOR each goal:
   - 全量 facet 匹配 + 全部中期复盘引用
-  - 最终评定：完全达成 / 部分达成 / 未达成 / 目标已变更
-  - 如果未达成：根因分析（基于 friction + loop 数据）
-  - 如果目标变更：追溯变更时间和原因
-输出：目标达成总表 + 未达成目标的改进路径
-
-| 目标 | 优先级 | 评定 | 达成度 | 根因/备注 |
-|------|-------|------|--------|----------|
+  - 对照 success_criteria 量化评估达成度
+  - 最终评定：完全达成 / 部分达成 / 未达成 / 目标已变更 / 已放弃
+  - 更新 status 为最终状态
+  - 如果未达成：根因分析（基于 friction + loop 数据），区分主观/客观原因
+  - 如果目标变更/放弃：从 goal_history 追溯完整变更时间线和原因
+输出：GRAI 目标回顾表格（填入报告模板的 grai:goal-review section，含完整变更时间线）
+输出：GRAI 结果比对表格（填入报告模板的 grai:result-comparison section，全量对照）
+输出：GRAI 原因分析（填入报告模板的 grai:analysis section，区分主观/客观/交互原因）
+输出：GRAI 规律总结（填入报告模板的 grai:insight section，区分项目特定经验和可迁移方法论）
 ```
 
 ### 分析组 B：诊断组（辅线，后执行）
@@ -175,6 +178,50 @@ final 模式特殊要求（全量视角）：
 
 ### Gene 验证报告
 （格式见 [validation-protocol.md](validation-protocol.md) 的「输出」section，包括**遵守亮点**、偏离告警、新 Gene 候选）
+
+<!-- grai:goal-review start -->
+### 目标回顾（完整变更时间线）
+| 目标 | 优先级 | 成功标准 | 最终状态 | 完整变更时间线 |
+|------|--------|---------|---------|--------------|
+（从 state.json goals 填入）
+（变更时间线从 goal_history 全量提取，格式：MM-DD action reason，按时间正序排列）
+（包含目标从创建到最终状态的完整生命周期）
+<!-- grai:goal-review end -->
+
+<!-- grai:result-comparison start -->
+### 结果比对（全量目标-结果对照）
+| 目标 | 预期成果（success_criteria） | 最终结果 | 达成度 | 亮点/不足 |
+|------|---------------------------|---------|--------|----------|
+（全量目标-结果对照，不仅是本轮增量，覆盖项目全周期）
+（基于全部 facet + 全部中期复盘交叉分析）
+
+**核心亮点**：（至少 2 条，带 session 证据链）
+**关键不足**：（至少 2 条，带用户原话引用 + 影响评估）
+<!-- grai:result-comparison end -->
+
+<!-- grai:analysis start -->
+### 原因分析
+#### 主观原因（用户决策/认知层面）
+...（带完整证据链：时间线 + 具体 session + 用户原话 + 行为后果 + 影响范围）
+#### 客观原因（AI/工具/环境层面）
+...（带完整证据链：时间线 + 具体 session + 工具表现 + 影响范围）
+#### 交互原因（人机协作层面）
+...（用户-AI 之间的沟通/协作模式导致的问题，带证据）
+<!-- grai:analysis end -->
+
+<!-- grai:insight start -->
+### 规律总结
+#### 项目特定经验（仅适用于本项目或同类项目）
+- IF [触发条件/场景] THEN [推荐做法] BECAUSE [证据/原因]
+- 适用边界：[何时适用] | 不适用场景：[何时不适用]
+
+#### 可跨项目迁移的方法论（通用性强，可沉淀为 Gene）
+- IF [触发条件/场景] THEN [推荐做法] BECAUSE [证据/原因]
+- 已验证次数：N 个 session | 验证场景多样性：[列举]
+- 适用边界：[何时适用] | 不适用场景：[何时不适用]
+<!-- grai:insight end -->
+
+---
 
 ### 项目成果
 - 交付了什么（列出关键产出物）
