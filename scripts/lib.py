@@ -272,13 +272,19 @@ def cmd_state_update(args):
             "date": today_iso(),
             "file": f"reviews/{today_iso()}-{review_type}.md",
         }
-        # 如果同时传入了 --grai-scores，关联最新的 GRAI 总分到 review
+        # 如果同时传入了 --grai-scores，关联 GRAI 四维度分数到 review
         if args.grai_scores is not None:
             try:
                 grai_data = json.loads(args.grai_scores)
                 if isinstance(grai_data, list):
                     grai_data = grai_data[-1] if grai_data else {}
-                review_entry["grai_score"] = grai_data.get("total", 0)
+                review_entry["grai_score"] = {
+                    "goal": grai_data.get("goal", 0),
+                    "result": grai_data.get("result", 0),
+                    "analysis": grai_data.get("analysis", 0),
+                    "insight": grai_data.get("insight", 0),
+                    "total": grai_data.get("total", 0),
+                }
             except (json.JSONDecodeError, AttributeError):
                 pass
         state.setdefault("reviews", []).append(review_entry)
