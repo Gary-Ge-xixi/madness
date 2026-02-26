@@ -5,7 +5,7 @@ Scans for differences between project Gene assets and shared-memory rules,
 outputs a sync report for user confirmation.
 
 Usage:
-  python3 scripts/sync_shared_memory.py \
+  python3 "$MADNESS_DIR"/scripts/sync_shared_memory.py \
     --shared-memory-dir ../shared-memory \
     --project-memory-dir ./memory \
     --direction both  # up/down/both

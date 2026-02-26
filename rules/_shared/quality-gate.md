@@ -4,7 +4,7 @@
 
 ```
 Step 1: 运行自动化检测
-  python3 scripts/check_report.py --file /tmp/madness_report_draft.md
+  python3 "$MADNESS_DIR"/scripts/check_report.py --file /tmp/madness_report_draft.md
   → 输出 JSON：score + 各规则得分明细
 
 Step 2: 判定

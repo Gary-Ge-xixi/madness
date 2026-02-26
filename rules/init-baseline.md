@@ -19,7 +19,7 @@
 
 运行聚合脚本获取结构化统计数据：
 ```bash
-python3 scripts/aggregate_facets.py --retro-dir .retro
+python3 "$MADNESS_DIR"/scripts/aggregate_facets.py --retro-dir .retro
 ```
 → 输出 JSON 含：by_goal_category、by_outcome、by_date、friction_top5、loop_rate、loop_sessions、ai_collab_summary、tools_distribution、avg_duration_min、total_files_changed
 

@@ -18,6 +18,22 @@ description: >
 
 > 一套结构化的项目复盘 workflow，从会话记录中提取可执行的改进行动，提升 AI 协作 productivity。
 
+## 脚本路径（重要，不可跳过）
+
+本技能的 Python 脚本位于技能安装目录的 `scripts/` 子目录下，**不在项目目录中**。
+
+```
+MADNESS_DIR="<本技能的 Base directory>"
+# 即技能加载时系统提供的 "Base directory for this skill" 值
+```
+
+**执行任何脚本时，必须使用绝对路径**：
+```bash
+python3 "$MADNESS_DIR"/scripts/xxx.py [args...]
+```
+
+**禁止使用** `python3 scripts/xxx.py`（相对路径），因为 CWD 是项目目录，不是技能目录，会导致 `No such file` 错误。
+
 ## 触发条件
 
 - 用户输入 `/madness` → 中期复盘
@@ -63,7 +79,7 @@ IF .retro/ 存在 AND memory/ 不存在 AND .retro/reviews/ 下有历史复盘�
 
 2. 创建目录结构 + state.json：
    ```bash
-   python3 scripts/lib.py state init \
+   python3 "$MADNESS_DIR"/scripts/lib.py state init \
      --project-name "用户回答的项目名" \
      --interval DAYS \
      --project-dir "当前项目根目录"
@@ -85,7 +101,7 @@ IF .retro/ 存在 AND memory/ 不存在 AND .retro/reviews/ 下有历史复盘�
 
      Step B: 比对去重（先比对，再下拉）
        运行 sync_shared_memory.py --direction down:
-         python3 scripts/sync_shared_memory.py \
+         python3 "$MADNESS_DIR"/scripts/sync_shared_memory.py \
            --shared-memory-dir ../shared-memory \
            --project-memory-dir ./memory \
            --direction down
@@ -104,18 +120,18 @@ IF .retro/ 存在 AND memory/ 不存在 AND .retro/reviews/ 下有历史复盘�
 5. 扫描已有 session 建立基线：
    ```bash
    # 扫描新 session
-   python3 scripts/scan_sessions.py \
+   python3 "$MADNESS_DIR"/scripts/scan_sessions.py \
      --state .retro/state.json --project-dir .
 
    # 对每个 session，子智能体提取 facet 后验证并缓存
-   python3 scripts/validate_facet.py cache \
+   python3 "$MADNESS_DIR"/scripts/validate_facet.py cache \
      --session-id SESSION_ID --input facet.json
    ```
 
 6. 基线分析 → 加载 [rules/init-baseline.md](rules/init-baseline.md) 执行两阶段分析
 
 7. **质量门控 + 展示报告**
-   - 运行 `python3 scripts/check_report.py --file /tmp/madness_report_draft.md`
+   - 运行 `python3 "$MADNESS_DIR"/scripts/check_report.py --file /tmp/madness_report_draft.md`
    - score ≥ 80 → 展示给用户看
    - score < 80 → 回到阶段 B 补充，重新检测（最多 2 次），仍不达标则标注「质量告警」后展示
    - 将质检分数附在报告末尾（用户可见）
@@ -161,13 +177,13 @@ IF .retro/ 存在但 memory/ 不存在:
    读取 state.json 的 goals 字段
    IF goals 为空:
      提示用户：「大锅，state.json 中没有项目目标记录。补充 1-3 个目标？」
-     用户补充 → 更新 state.json（python3 scripts/lib.py state update --project-dir . --goals '[...]'）
+     用户补充 → 更新 state.json（python3 "$MADNESS_DIR"/scripts/lib.py state update --project-dir . --goals '[...]'）
      用户跳过 → 继续，但在报告中标注「目标未定义，无法做 Goal-Gap 分析」
    ELSE:
      展示当前目标列表，问「目标有变化吗？」
      变化 → 更新；无变化 → 继续
 1. 扫描新 session：
-   python3 scripts/scan_sessions.py \
+   python3 "$MADNESS_DIR"/scripts/scan_sessions.py \
      --state .retro/state.json --project-dir .
    → 输出 JSON 数组到 stdout，包含 session_id、file_path、message_count、date
 2. 扫描产出物变化：
@@ -183,15 +199,15 @@ IF .retro/ 存在但 memory/ 不存在:
 
 ```
 1. 获取未缓存 session 列表：
-   python3 scripts/validate_facet.py list-uncached \
-     --sessions "$(python3 scripts/scan_sessions.py --state .retro/state.json --project-dir .)"
+   python3 "$MADNESS_DIR"/scripts/validate_facet.py list-uncached \
+     --sessions "$(python3 "$MADNESS_DIR"/scripts/scan_sessions.py --state .retro/state.json --project-dir .)"
    → 输出需要提取 facet 的 session 列表
 
 2. 对每个未缓存的 session：
    a. 如果 session 内容 >30K 字符，分 25K 块摘要
    b. 子智能体提取 facet（字段定义见下方）
    c. 验证并缓存：
-      python3 scripts/validate_facet.py cache \
+      python3 "$MADNESS_DIR"/scripts/validate_facet.py cache \
         --session-id SESSION_ID --input facet.json
       → 自动验证 13 必填字段 + 枚举值 + ai_collab 结构（5 类）+ extraction_confidence，失败则报错
 ```
@@ -249,7 +265,7 @@ ELSE:
    - 执行 Step 6（Gene 化 + CLAUDE.md 注入）
    - 写入 .retro/reviews/YYYY-MM-DD-{mid|final}.md
    - 更新 state.json：
-     python3 scripts/lib.py state update \
+     python3 "$MADNESS_DIR"/scripts/lib.py state update \
        --last-review-at TODAY \
        --sessions-up-to LAST_SESSION_ID \
        --add-review mid|final
@@ -269,14 +285,14 @@ ELSE:
 1. 收集 Gene 候选（来自质询第 4 轮 + 报告改进建议）
 2. 分类为 gene/sop/pref
 3. 写入 memory/：
-   python3 scripts/manage_assets.py create \
+   python3 "$MADNESS_DIR"/scripts/manage_assets.py create \
      --type gene|sop|pref --data '{"title":"...","domain":[...],"trigger":"...","method":[...]}'
 4. CLAUDE.md 注入 Reflection：
-   python3 scripts/inject_claudemd.py \
+   python3 "$MADNESS_DIR"/scripts/inject_claudemd.py \
      --claudemd ./CLAUDE.md --memory-dir ./memory --backup
 5. 生成领域视图 MD
 
-如果 memory/ 目录不存在 → 先运行 python3 scripts/manage_assets.py init --project-dir .
+如果 memory/ 目录不存在 → 先运行 python3 "$MADNESS_DIR"/scripts/manage_assets.py init --project-dir .
 
 如果本次复盘无 Gene 候选（全部「已澄清」或「待观察」）→ 跳过写入，仅执行验证结果的 confidence 更新
 ```

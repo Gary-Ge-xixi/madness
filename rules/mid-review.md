@@ -13,7 +13,7 @@
 
 先运行结构化验证脚本：
 ```bash
-python3 scripts/validate_genes.py \
+python3 "$MADNESS_DIR"/scripts/validate_genes.py \
   --memory-dir ./memory --retro-dir .retro --since LAST_REVIEW_DATE
 ```
 
@@ -30,7 +30,7 @@ python3 scripts/validate_genes.py \
 
 ### 分析组 A：诊断（按顺序逐项分析）
 
-> **数据基础**：先运行 `python3 scripts/aggregate_facets.py --retro-dir .retro --since LAST_REVIEW_DATE` 获取聚合统计（goal_category 分布、friction Top5、loop_rate、ai_collab 统计等）。以下分析基于脚本输出 + 子智能体深度归因。
+> **数据基础**：先运行 `python3 "$MADNESS_DIR"/scripts/aggregate_facets.py --retro-dir .retro --since LAST_REVIEW_DATE` 获取聚合统计（goal_category 分布、friction Top5、loop_rate、ai_collab 统计等）。以下分析基于脚本输出 + 子智能体深度归因。
 
 **1. 循环检测**
 

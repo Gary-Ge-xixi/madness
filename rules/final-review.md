@@ -14,7 +14,7 @@
 
 先运行结构化验证脚本（使用全部 facet，不加 --since 过滤）：
 ```bash
-python3 scripts/validate_genes.py \
+python3 "$MADNESS_DIR"/scripts/validate_genes.py \
   --memory-dir ./memory --retro-dir .retro
 ```
 
@@ -97,7 +97,7 @@ FOR each goal:
 
 ### 分析组 B：诊断组（辅线，后执行）
 
-> **数据基础**：运行 `python3 scripts/aggregate_facets.py --retro-dir .retro` 获取全量聚合统计。以下分析基于脚本输出 + 子智能体深度归因。
+> **数据基础**：运行 `python3 "$MADNESS_DIR"/scripts/aggregate_facets.py --retro-dir .retro` 获取全量聚合统计。以下分析基于脚本输出 + 子智能体深度归因。
 
 **1. 全程摩擦热力图**
 
@@ -231,13 +231,13 @@ Summary 展示后，必须询问：
 0. 强制 memory/ 存在性检查：
    IF memory/ 不存在:
      警告：「总复盘必须先完成 Gene 化，但 memory/ 目录不存在。」
-     自动运行 python3 scripts/manage_assets.py init --project-dir .
+     自动运行 python3 "$MADNESS_DIR"/scripts/manage_assets.py init --project-dir .
      然后继续执行下方流程
 1. 写入 .retro/reviews/YYYY-MM-DD-final.md（完整分析）
 2. 更新 state.json
 3. 执行 Step 6（Gene 化 + CLAUDE.md 注入）→ 加载 [gene-protocol.md](gene-protocol.md)
 4. 生成 portable.json 导出包：
-   python3 scripts/manage_assets.py export-portable --min-confidence 0.70 --memory-dir ./memory
+   python3 "$MADNESS_DIR"/scripts/manage_assets.py export-portable --min-confidence 0.70 --memory-dir ./memory
    → 自动筛选 active 且 confidence≥0.70 的资产
    → confidence 重置为 0.60，status 设为 "provisional"
    → 保留 original_confidence 字段
@@ -246,7 +246,7 @@ Summary 展示后，必须询问：
    ```
    IF 父目录有 shared-memory/:
      Step A: 检测候选
-       python3 scripts/sync_shared_memory.py \
+       python3 "$MADNESS_DIR"/scripts/sync_shared_memory.py \
          --shared-memory-dir ../shared-memory \
          --project-memory-dir ./memory \
          --direction up
