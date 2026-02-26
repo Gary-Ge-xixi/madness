@@ -90,6 +90,20 @@ python3 "$MADNESS_DIR"/scripts/aggregate_facets.py --retro-dir .retro
 ```markdown
 # [项目名] — 初始化基线报告
 
+<!-- grai:goal-review start -->
+## 零、目标确认
+（init 模式下是首次目标确认，不是回顾变更）
+
+| 目标 | 优先级 | 成功标准 | 初始状态 |
+|------|--------|---------|---------|
+（从 state.json goals 填入，status 均为 not_started）
+
+**目标完备性检查**：
+- 是否所有目标都有量化的 success_criteria？（如有缺失，在此标注）
+- 目标之间是否有依赖或冲突关系？
+- 按当前 session 数据，初步预判各目标的可行性
+<!-- grai:goal-review end -->
+
 ## 一、项目全景
 - 基础统计表（会话数、消息数、达成率、循环率）
 - 产出清单
