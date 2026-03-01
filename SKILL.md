@@ -225,7 +225,17 @@ IF .retro/ 存在但 memory/ 不存在:
    → 输出需要提取 facet 的 session 列表
 
 2. 对每个未缓存的 session：
-   a. 如果 session 内容 >30K 字符，分 25K 块摘要
+   a. 使用 read_session.py 读取 session 内容（**禁止自行编写 Python 一行代码解析 JSONL**）：
+      ```bash
+      # 查看 session 统计（大小、消息数、类型分布）
+      python3 "$MADNESS_DIR"/scripts/read_session.py stats /path/to/session.jsonl
+
+      # 读取原始内容用于 facet 提取（默认 50K 字符，超出自动截断）
+      python3 "$MADNESS_DIR"/scripts/read_session.py raw /path/to/session.jsonl
+
+      # 如果 session 内容 >30K 字符，分块读取：
+      python3 "$MADNESS_DIR"/scripts/read_session.py raw /path/to/session.jsonl --max-chars 25000
+      ```
    b. 子智能体提取 facet（字段定义见下方）
    c. 验证并缓存：
       python3 "$MADNESS_DIR"/scripts/validate_facet.py cache \

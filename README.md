@@ -146,6 +146,7 @@ madness/
 │   ├── check_report.py         # 报告质量红线自检（7 条规则，满分 100）
 │   ├── manage_assets.py        # Gene/SOP/Pref 资产 CRUD + memory/ 初始化
 │   ├── inject_claudemd.py      # CLAUDE.md 规则注入
+│   ├── read_session.py         # Session JSONL 安全读取（preview/raw/stats）
 │   └── scan_sessions.py        # 会话扫描
 └── docs/plans/                 # 设计文档与实现计划
 ```
@@ -191,6 +192,7 @@ memory/                         # 认知资产（可跨项目继承）
   - 所有节点保留 Other 自由输入选项，Fallback 到纯文本模式（工具不可用时）
 - **步骤命名规范化**：质询协议从 Round 0/0.5/1-3/4/4.5 重命名为 Step 1-7 顺序编号
   - Step 1: AI 自审 → Step 2: 证据构建 → Step 3: 亮点确认 → Step 4: 攻击性质询 → Step 5: 触发条件提炼 → Step 6: 学习路径推荐 → Step 7: 输出
+- **新增 read_session.py**：安全读取 session JSONL 文件（preview/raw/stats），修复 AI 动态生成 Python 一行代码解析 JSONL 时因非法 JSON 行导致的 `json.JSONDecodeError` 崩溃
 
 ### v2.1.1 (2026-02-26) — 脚本输入健壮性修复
 
