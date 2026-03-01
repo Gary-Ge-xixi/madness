@@ -141,7 +141,7 @@ FOR each asset IN all_active_assets:
      IF facet.learning 非空
        AND 该 learning 与所有现有 Gene 的 trigger 场景不匹配
      THEN 标记为新 Gene 候选：
-       推入苏格拉底质询第 4 轮的提炼队列
+       推入苏格拉底质询 Step 5 的提炼队列
        输出：「session [X] 中发现新模式："[learning]"，
               与现有 Gene 库无匹配，建议在质询中提炼为规则。」
 ```
@@ -169,7 +169,7 @@ FOR each asset IN all_active_assets:
 - ...（如无偏离则标注「本轮无偏离」）
 
 **新 Gene 候选**：
-- [推入质询第 4 轮的新模式描述]
+- [推入质询 Step 5 的新模式描述]
 - ...（如无则标注「本轮无新候选」）
 ```
 

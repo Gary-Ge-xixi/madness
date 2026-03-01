@@ -111,10 +111,13 @@ git clone https://github.com/Gary-Ge-xixi/madness.git .claude/skills/madness
 
 ### 苏格拉底质询
 
-4 轮质询，不是温柔的总结，是逼用户面对思维盲区：
-- Round 0.5（可选）：亮点确认 — 先肯定后质疑，降低防御心理
-- 第 1-3 轮：攻击性提问（引用 session 原话，追问证据）
-- 第 4 轮：触发条件提炼 — 将隐性知识压成 IF/THEN 规则
+7 步结构化质询，不是温柔的总结，是逼用户面对思维盲区：
+- Step 1-2：AI 自审 + 证据构建（内部执行）
+- Step 3（可选）：亮点确认 — 先肯定后质疑，降低防御心理
+- Step 4：攻击性质询 3 轮（引用 session 原话，追问证据）— 通过 AskUserQuestion 提供结构化回复选项
+- Step 5：触发条件提炼 — 将隐性知识压成 IF/THEN 规则
+- Step 6（可选）：学习路径推荐 — 基于认知缺陷推荐具体学习方向
+- Step 7：输出追加到报告
 
 ### 跨团队共享
 
@@ -132,7 +135,7 @@ madness/
 │   ├── init-baseline.md        # Init 模式两阶段分析
 │   ├── mid-review.md           # Mid 模式聚合分析
 │   ├── final-review.md         # Final 模式聚合分析 + portable.json
-│   ├── socratic.md             # 苏格拉底质询协议（含 Round 0.5 + 第 4 轮提炼）
+│   ├── socratic.md             # 苏格拉底质询协议（7 步：自审→证据→亮点→质询→提炼→学习→输出）
 │   ├── gene-protocol.md        # Gene 化执行协议 + CLAUDE.md Reflection
 │   ├── validation-protocol.md  # Gene 验证与偏离检测协议（四级匹配）
 │   └── bad-cases.md            # 质量反面教材（6 条自检规则）
@@ -178,6 +181,16 @@ memory/                         # 认知资产（可跨项目继承）
 6. **摘要/详情分离** — 先展示 ≤500 字摘要，用户要求时展开详情
 
 ## 更新记录
+
+### v2.2.0 (2026-03-01) — 苏格拉底质询交互升级
+
+- **AskUserQuestion 集成**：苏格拉底质询关键交互节点从纯文本改为结构化选项
+  - Step 4 攻击性质询：用户可点选「我有证据反驳」「确实没深想」「部分认同」，降低回复成本
+  - Step 5 触发条件提炼：回显确认、「说不清楚」候选选择、「不需要规则化」追问均使用结构化选项
+  - Step 6 学习路径推荐：单缺陷单选、多缺陷 multiSelect 批量勾选
+  - 所有节点保留 Other 自由输入选项，Fallback 到纯文本模式（工具不可用时）
+- **步骤命名规范化**：质询协议从 Round 0/0.5/1-3/4/4.5 重命名为 Step 1-7 顺序编号
+  - Step 1: AI 自审 → Step 2: 证据构建 → Step 3: 亮点确认 → Step 4: 攻击性质询 → Step 5: 触发条件提炼 → Step 6: 学习路径推荐 → Step 7: 输出
 
 ### v2.1.1 (2026-02-26) — 脚本输入健壮性修复
 

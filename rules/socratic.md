@@ -2,7 +2,7 @@
 
 > 在展示报告后、确认存盘前执行。目标不是总结问题，是逼用户面对思维盲区。
 
-## 前置步骤 0：AI 执行质量自审（不可跳过）
+## Step 1：AI 执行质量自审（不可跳过）
 
 > 加载 [_shared/ai-audit.md](_shared/ai-audit.md) 执行。
 
@@ -10,7 +10,7 @@
 
 ```
 IF ai_execution 问题 ≥ 1:
-  Socratic 第 1 轮必须先质询 AI 执行问题
+  Step 4 第 1 轮必须先质询 AI 执行问题
   质询措辞示例：
   - 「在 [日期] 的会话中，你给了 AI [参数/参考]，但 AI 实现时 [偏差描述]。这不是你的问题，是 AI 执行偏差。我们需要一条规则来防止下次再犯。」
   - 「CLAUDE.md 第 N 行写了 [规则]，但 AI 在 [session] 中没有遵循。这是 AI 的规范遵循缺陷，不是你的指令不够清晰。」
@@ -20,26 +20,26 @@ IF ai_execution 问题 ≥ 1:
 
 ---
 
-## 前置：证据构建（内部执行，不展示）
+## Step 2：证据构建（内部执行，不展示）
 
 > 按 [_shared/ai-audit.md](_shared/ai-audit.md) 的五类用户行为检测定义，从 facet 的 `ai_collab` 字段 + 原始 session 中寻找嫌疑。
 
 如果 facet 中证据不足，回到原始 session 数据补充。
 构建至少 3 条"起诉书"后进入质询。
 
-## 可选 Round 0.5: 亮点确认
+## Step 3：亮点确认（可选）
 
 > 在攻击性质询前，先用 1-2 句话确认正向行为。降低用户防御心理。
 
 IF 本轮有 validated_highlights（来自阶段 A.0）:
   用 1-2 句话确认亮点，例如：
   「大锅，这轮做得好的：[asset_title] 规则你执行到位了，效果也验证了。」
-  不展开讨论，快速进入 Round 1。
+  不展开讨论，快速进入 Step 4。
 
 IF 无 validated_highlights:
-  跳过，直接进入 Round 1。
+  跳过，直接进入 Step 4。
 
-## 执行：3 轮质询
+## Step 4：攻击性质询（3 轮）
 
 ### 铁律
 
@@ -61,21 +61,44 @@ IF 无 validated_highlights:
 
 每轮：
 1. 提出 1-2 个攻击性问题（必须有证据）
-2. 等用户回答
-3. 用户有理有据 → 记录「已澄清」→ 下一轮
-   用户说不清楚 → 记录「认知缺陷」→ 追问
+2. **使用 AskUserQuestion 收集结构化回复**（证据 + 提问写入 `question` 文本，选项用于分类回复）：
 
-## 第 4 轮：触发条件提炼 (Trigger Distillation)
+```
+AskUserQuestion({
+  questions: [{
+    question: "在 [日期] 的会话中，[证据描述 + 攻击性提问]",
+    header: "质询RN",  // N = 当前轮次
+    options: [
+      { label: "我有证据反驳", description: "我当时做了对比/验证，可以具体说明" },
+      { label: "确实没深想", description: "承认这个点没考虑周全" },
+      { label: "部分认同", description: "有些方面做了验证，有些确实漏了" }
+    ],
+    multiSelect: false
+  }]
+})
+```
+
+   如果一轮有 2 个问题，使用 `questions` 数组一次发送（最多 4 个）。
+
+3. 根据用户选择分类：
+   - 选「我有证据反驳」→ 追问让其补充证据（用普通文本追问或再次 AskUserQuestion）→ 证据充分记录「已澄清」
+   - 选「确实没深想」→ 记录「认知缺陷」→ 进入追问
+   - 选「部分认同」→ 记录「部分澄清」→ 追问未覆盖的部分
+   - 选「Other」自由输入 → AI 判断分类（有理有据→已澄清，否则→认知缺陷）
+
+> **Fallback**：若 AskUserQuestion 工具不可用，退回纯文本提问 + 等待自由文本回复的方式。
+
+## Step 5：触发条件提炼 (Trigger Distillation)
 
 > 把质询中暴露的隐性知识，当场压成结构化的 Gene 触发条件。不可跳过。
 
 ### 前置条件
 
-第 1-3 轮已完成，已产出「思维尸检」初稿和「行为纠偏指南」初稿。
+Step 4 已完成，已产出「思维尸检」初稿和「行为纠偏指南」初稿。
 
 ### 额外弹药来源
 
-如果本次复盘执行了 Gene 验证（阶段 A.0），以下验证发现也作为第 4 轮的输入：
+如果本次复盘执行了 Gene 验证（阶段 A.0），以下验证发现也作为 Step 5 的输入：
 - 「遵守但无效」的 Gene → 追问规则是否需要修订
 - 「未遵守但成功」的 Gene → 追问 trigger 是否过宽
 - SOP/Pref 偏离 → 追问是否需要更新规则
@@ -98,28 +121,69 @@ FOR each 行为纠偏指南中的「强制约束」:
 
   2. 用户回答后，Agent 做两件事：
      a. 将用户的自然语言转译为伪代码格式的 trigger/skip_when
-     b. 回显给用户确认：「我理解的是：
-        IF [伪代码条件] THEN [做法]
-        SKIP IF [伪代码条件]
-        对吗？」
+     b. 使用 AskUserQuestion 回显确认：
+        ```
+        AskUserQuestion({
+          questions: [{
+            question: "我理解的是：\nIF [伪代码条件] THEN [做法]\nSKIP IF [伪代码跳过条件]\n对吗？",
+            header: "确认规则",
+            options: [
+              { label: "对，就这样", description: "确认，暂存为 Gene 候选" },
+              { label: "需要修改", description: "大方向对但细节要调整，让我补充" }
+            ],
+            multiSelect: false
+          }]
+        })
+        ```
 
-  3. 用户确认 → 暂存为 Gene 候选（status = 待Gene化）
-     用户修正 → 按修正后版本暂存
+  3. 用户选「对，就这样」→ 暂存为 Gene 候选（status = 待Gene化）
+     用户选「需要修改」→ 用户补充修正 → 按修正后版本暂存
+     用户选「Other」→ 自由输入修正内容 → Agent 重新转译并再次确认
 
   特殊情况处理：
+
   - 用户说「说不清楚」
-    → Agent 基于 facet 证据给出 2 个候选 trigger，让用户选
+    → 使用 AskUserQuestion 提供候选 trigger：
+    ```
+    AskUserQuestion({
+      questions: [{
+        question: "你说不太清楚触发条件，我基于证据给你 2 个候选，选一个最接近的：",
+        header: "触发条件",
+        options: [
+          { label: "候选 A", description: "IF [基于 facet 证据的条件A] THEN [做法A]" },
+          { label: "候选 B", description: "IF [基于 facet 证据的条件B] THEN [做法B]" }
+        ],
+        multiSelect: false
+      }]
+    })
+    ```
     → 选中的暂存为 Gene 候选
+    → 选「Other」→ 用户自由描述，Agent 转译
 
   - 用户说「这个不需要规则化」
-    → 追问：「那你怎么保证下次不犯？」
-    → 用户给出合理论证 → 记录「已澄清，不 Gene 化」，附用户论证
-    → 用户说不清 → 标记「待观察」，下次复盘再验证
+    → 使用 AskUserQuestion 追问：
+    ```
+    AskUserQuestion({
+      questions: [{
+        question: "你说这个不需要规则化。那你怎么保证下次不犯？",
+        header: "规则化",
+        options: [
+          { label: "我有替代方案", description: "我有其他方式确保不再犯，让我说明" },
+          { label: "确实说不清", description: "标记为待观察，下次复盘再验证" },
+          { label: "这本来就不是问题", description: "我不认为这是缺陷，让我论证" }
+        ],
+        multiSelect: false
+      }]
+    })
+    ```
+    → 选「我有替代方案」或「这本来就不是问题」→ 用户补充论证 → 合理则记录「已澄清，不 Gene 化」，附用户论证
+    → 选「确实说不清」→ 标记「待观察」，下次复盘再验证
+    → 选「Other」→ 自由输入，AI 判断分类
 ```
 
-## 可选 Round 4.5：学习路径推荐
+## Step 6：学习路径推荐（可选）
 
-> 在第 4 轮完成后，基于质询中暴露的认知缺陷，推荐具体学习方向。
+> 在 Step 5 完成后，基于质询中暴露的认知缺陷，推荐具体学习方向。
 
 ```
 IF 思维尸检中存在「认知缺陷」（severity = 高 或 中）:
@@ -133,9 +197,43 @@ IF 思维尸检中存在「认知缺陷」（severity = 高 或 中）:
        - 学习形式：文档/教程/实践项目/开源代码阅读
        - 预期投入：30min / 2hr / 1天
        - 验收标准：学完后能做到什么
-    3. 问用户：「这个学习方向你感兴趣吗？要加入下一步行动吗？」
-       用户确认 → 追加到报告「下一步行动」
-       用户跳过 → 不追加
+    3. 使用 AskUserQuestion 收集用户决策：
+
+       单个认知缺陷时：
+       ```
+       AskUserQuestion({
+         questions: [{
+           question: "检测到认知缺陷：[描述]。推荐学习方向：[关键词]（[形式]，约[投入时间]）。要加入行动计划吗？",
+           header: "学习路径",
+           options: [
+             { label: "加入计划", description: "追加到报告「下一步行动」" },
+             { label: "先跳过", description: "知道了但暂时不加入" },
+             { label: "换个方向", description: "我觉得应该学别的，让我说" }
+           ],
+           multiSelect: false
+         }]
+       })
+       ```
+
+       多个认知缺陷时，用 multiSelect 一次问：
+       ```
+       AskUserQuestion({
+         questions: [{
+           question: "以下学习方向，哪些你想加入行动计划？",
+           header: "学习路径",
+           options: [
+             { label: "[缺陷1] 学习方向", description: "[关键词]，[形式]，约[投入]" },
+             { label: "[缺陷2] 学习方向", description: "[关键词]，[形式]，约[投入]" },
+             { label: "[缺陷3] 学习方向", description: "[关键词]，[形式]，约[投入]" }
+           ],
+           multiSelect: true
+         }]
+       })
+       ```
+
+       - 选中的 → 追加到报告「下一步行动」
+       - 未选中的 → 不追加
+       - 选「换个方向」或「Other」→ 用户说明替代方向，Agent 评估后追加
 
 IF 无显著认知缺陷:
   跳过此轮。
@@ -150,19 +248,19 @@ IF 无显著认知缺陷:
 
 | ID（建议） | 触发条件 | 跳过条件 | 来源 | 状态 |
 |-----------|---------|---------|------|------|
-| [kebab-case] | IF [伪代码] | IF [伪代码] | 质询第N轮 / Gene验证 | 待 Gene 化 |
-| — | 用户说不清 | — | 质询第N轮 | 待观察 |
-| — | — | — | 质询第N轮 | 已澄清，不 Gene 化 |
+| [kebab-case] | IF [伪代码] | IF [伪代码] | Step 4/5 / Gene验证 | 待 Gene 化 |
+| — | 用户说不清 | — | Step 4/5 | 待观察 |
+| — | — | — | Step 4/5 | 已澄清，不 Gene 化 |
 ```
 
-### 与 Step 6 的衔接
+### 与 Gene 化的衔接
 
-第 4 轮产出的 Gene 候选列表，在用户确认报告后，由 Step 6（Gene 化）统一处理：
+Step 5 产出的 Gene 候选列表，在用户确认报告后，由 Gene 化流程统一处理：
 - 「待 Gene 化」→ 进入 [gene-protocol.md](gene-protocol.md) 的 Step 6.1-6.5
 - 「待观察」→ 记录到 evolution.jsonl（event: "pending_observation"），不写入 genes.json
 - 「已澄清」→ 不做任何处理
 
-## 输出：追加到报告末尾
+## Step 7：输出 — 追加到报告末尾
 
 质询完成后追加：
 
@@ -178,10 +276,10 @@ IF 无显著认知缺陷:
     3. **触发器**：什么信号提醒你正在犯
 
     ### 提炼的 Gene 候选
-    （由第 4 轮产出，格式见上方「第 4 轮」section）
+    （由 Step 5 产出，格式见上方 Step 5 section）
 
     ### 学习路径推荐
-    （由 Round 4.5 产出，仅当存在认知缺陷时）
+    （由 Step 6 产出，仅当存在认知缺陷时）
 
     | 缺陷 | 类型 | 学习关键词 | 形式 | 投入 | 验收标准 |
     |------|------|-----------|------|------|---------|

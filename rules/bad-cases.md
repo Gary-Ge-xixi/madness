@@ -170,7 +170,7 @@ A/B 测试: 新版 Prompt 先在 1-2 份文件上测试，对比旧版差异，�
 ### 修复
 
 1. 新增 `ai_execution` facet 字段（param_fidelity、spec_compliance、first_round_accuracy、rework_attribution）
-2. socratic.md 新增前置步骤 0（AI 执行质量自审），归因优先级：AI > 流程 > 用户
+2. socratic.md Step 1（AI 执行质量自审），归因优先级：AI > 流程 > 用户
 3. 所有分析组（init/mid/final）新增 AI 执行审计维度
 
 ### 教训
